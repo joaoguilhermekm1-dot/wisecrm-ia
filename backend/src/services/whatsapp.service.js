@@ -29,7 +29,9 @@ class WhatsAppService {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }), 
-        browser: Browsers.macOS('Desktop')
+        browser: ['WiseCRM', 'Chrome', '1.0.0'],
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 15000
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -51,10 +53,19 @@ class WhatsAppService {
           this.status = 'DISCONNECTED';
           
           if (shouldReconnect) {
-            this.initialize(showQR);
+            // Esperar 3 segundos antes de reconectar para estabilizar no Render
+            setTimeout(() => {
+              this.initialize(showQR);
+            }, 3000);
           } else {
-            console.log('[WhatsApp] Desconectado permanentemente (Logged out).');
+            console.log('[WhatsApp] Desconectado permanentemente (Logged out). Limpando pasta de auth...');
             this.qrCodeBase64 = null;
+            
+            const fs = require('fs');
+            const authPath = './baileys_auth_info';
+            if (fs.existsSync(authPath)) {
+              fs.rmSync(authPath, { recursive: true, force: true });
+            }
           }
         } else if (connection === 'open') {
           console.log('[WhatsApp] Conexão Estabelecida com Sucesso! 🚀');
