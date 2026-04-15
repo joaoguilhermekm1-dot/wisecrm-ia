@@ -13,11 +13,10 @@ const app = express();
 // Security Middleware
 app.use(helmet());
 app.use(cors({
-  origin: [
-    'http://localhost:5173', 
-    'https://wisecrm-ia.vercel.app', 
-    process.env.FRONTEND_URL
-  ].filter(Boolean),
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    return callback(null, origin);
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
