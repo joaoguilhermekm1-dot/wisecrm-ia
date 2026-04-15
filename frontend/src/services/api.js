@@ -26,7 +26,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Não deslogar se for uma tentativa de login intencional
+    const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+    
+    if (error.response?.status === 401 && !isLoginEndpoint) {
       localStorage.removeItem('wise_token');
       localStorage.removeItem('wise_user');
       window.location.href = '/login';
