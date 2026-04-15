@@ -224,30 +224,43 @@ exports.sendMessage = async (req, res) => {
     if (!lead) return res.status(404).json({ error: 'Lead não encontrado.' });
 
     // 1. Enviar via motor WhatsApp se houver telefone
+    let sentViaWhatsApp = false;
     if (lead.phone || lead.whatsappJid) {
        try {
          const { type, mediaUrl, filename } = req.body;
          await whatsappService.sendMessage(lead.phone || lead.whatsappJid, content, { type, mediaUrl, filename });
+         sentViaWhatsApp = true;
        } catch (wsErr) {
          console.error('[Leads Controller] Erro ao disparar WA:', wsErr.message);
        }
     }
 
-    const conversationId = lead.conversations[0]?.id || null;
+    let message = null;
 
-    // 2. Salvar no Banco
-    const message = await prisma.message.create({
-      data: {
-        content: content || '[Mídia]',
-        sender: 'user',
-        type: req.body.type || 'text',
-        leadId,
-        conversationId
+    // 2. Se NÃO foi enviado pelo WhatsApp, salvar no Banco localmente para manter o histórico CRM
+    if (!sentViaWhatsApp) {
+      // Garantir que exista uma Conversation
+      let conversationId = lead.conversations[0]?.id || null;
+      if (!conversationId) {
+         const jidLocal = lead.whatsappJid || (lead.phone ? `${lead.phone}@s.whatsapp.net` : `local_${leadId}`);
+         const newConv = await prisma.conversation.upsert({
+           where: { jid: jidLocal },
+           update: { updatedAt: new Date() },
+           create: { jid: jidLocal, leadId, platform: 'crm' }
+         });
+         conversationId = newConv.id;
       }
-    });
 
-    // 3. Atualizar lastMessage na Conversation e lastInteractionAt no Lead
-    if (conversationId) {
+      message = await prisma.message.create({
+        data: {
+          content: content || '[Mídia]',
+          sender: 'user',
+          type: req.body.type || 'text',
+          leadId,
+          conversationId
+        }
+      });
+
       await prisma.conversation.update({
         where: { id: conversationId },
         data: { lastMessage: content || '[Mídia]', unreadCount: 0 }
@@ -259,7 +272,7 @@ exports.sendMessage = async (req, res) => {
       data: { lastInteractionAt: new Date() }
     });
 
-    res.status(201).json(message);
+    res.status(201).json(message || { external: true });
   } catch (err) {
     console.error('[Leads Controller] Erro ao enviar mensagem:', err);
     res.status(500).json({ error: 'Erro ao enviar mensagem.' });

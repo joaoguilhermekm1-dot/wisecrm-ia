@@ -141,7 +141,19 @@ class WhatsAppService {
     try {
       let jid = target;
       if (!target.includes('@')) {
-        jid = `${target.replace(/\D/g, '')}@s.whatsapp.net`;
+        let cleanPhone = target.replace(/\D/g, '');
+        jid = `${cleanPhone}@s.whatsapp.net`;
+        
+        // CORREÇÃO DO 9º DÍGITO (BRASIL): Verificar se o JID canônico oficial difere do nosso chute
+        try {
+          const [result] = await this.sock.onWhatsApp(cleanPhone);
+          if (result && result.exists) {
+            jid = result.jid;
+            console.log(`[WhatsApp] JID validado: ${cleanPhone} -> ${jid}`);
+          }
+        } catch (e) {
+          console.warn('[WhatsApp] Erro ao validar JID no servidor, tentando forçado...', e.message);
+        }
       }
       
       const { type = 'text', mediaUrl, filename } = options;
