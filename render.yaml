@@ -2,6 +2,7 @@ services:
   - type: web
     name: wisecrm-backend
     env: node
+    plan: free
     rootDir: backend
     buildCommand: npm install && npm run build
     startCommand: npm start
