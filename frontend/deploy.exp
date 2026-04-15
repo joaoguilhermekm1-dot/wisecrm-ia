@@ -1,0 +1,6 @@
+spawn npx --yes surge ./dist wisecrmia.surge.sh
+expect "email:"
+send "insightflow.wisesaas@gmail.com\r"
+expect "password:"
+send "WiseSaasMaster2026!\r"
+expect eof

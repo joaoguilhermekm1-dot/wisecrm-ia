@@ -1,0 +1,9 @@
+{
+  "ignore": [
+    "node_modules",
+    "baileys_auth_info",
+    "baileys_auth_info/*",
+    "*.log"
+  ],
+  "delay": 1000
+}

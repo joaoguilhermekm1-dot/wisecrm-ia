@@ -1,0 +1,57 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/components/AddLeadModal.jsx
+  3:10  error  'clsx' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/components/Map/ProcessNode.jsx
+  4:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/components/Sidebar.jsx
+  27:11  error  'user' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/pages/Leads.jsx
+  32:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  30 |
+  31 |   useEffect(() => {
+> 32 |     fetchLeads();
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  33 |   }, []);
+  34 |
+  35 |   const handleAddLead = async (formData) => {  react-hooks/set-state-in-effect
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/pages/MapView.jsx
+  121:3  error  'useEffect' is not defined  no-undef
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/pages/MarketingHub.jsx
+  38:10  error  'loading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/Users/joaoguilhermekaminskidesouza/Documents/Projetos desenvolvedor/Antigravity/Projeto SAAS - insigthflow/frontend/src/store/AuthContext.jsx
+  26:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  24 |         });
+  25 |     } else {
+> 26 |       setLoading(false);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  27 |     }
+  28 |   }, [token]);
+  29 |  react-hooks/set-state-in-effect
+  64:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-refresh/only-export-components
+
+✖ 8 problems (8 errors, 0 warnings)
+
