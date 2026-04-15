@@ -20,13 +20,23 @@ exports.getPipeline = async (req, res) => {
     }
 
     // Auto-repair: se pipeline tem menos de 3 estágios, forçar reset para o padrão
-    const stages = Array.isArray(pipeline.stages) ? pipeline.stages : [];
+    let stages = [];
+    if (typeof pipeline.stages === 'string') {
+      try { stages = JSON.parse(pipeline.stages); } catch (e) { stages = []; }
+    } else if (Array.isArray(pipeline.stages)) {
+      stages = pipeline.stages;
+    }
+
     if (stages.length < 3) {
       pipeline = await prisma.pipeline.update({
         where: { id: pipeline.id },
         data: { stages: DEFAULT_STAGES }
       });
+      stages = DEFAULT_STAGES;
     }
+    
+    // Assegura que mande pro front-end formatado como array
+    pipeline.stages = stages;
 
     res.json(pipeline);
   } catch (err) {
