@@ -6,7 +6,7 @@ import {
   BrainCircuit, Zap, ChevronRight, Mic,
   Paperclip, FileText, Square, Trash2,
   CheckCircle2, X, Image as ImageIcon, Wifi, WifiOff,
-  RefreshCcw, PlusMessageSquare, Users
+  RefreshCcw, MessageSquarePlus, Users
 } from 'lucide-react';
 import { leadsApi, messagesApi, uploadApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket, viewChat, leaveChat } from '../services/socket';
@@ -58,12 +58,6 @@ function ConversationItem({ conv, active, onClick }) {
     </button>
   );
 }
-
-      </div>
-    </div>
-  );
-}
-
 // ── Template Selector ──────────────────────────────────────────────────────
 function TemplateSelector({ templates, onSelect, onClose, loading }) {
   return (
@@ -698,7 +692,7 @@ export default function Inbox() {
                 className="p-1.5 rounded-lg hover:bg-white/5 text-[#FAD485] transition-all"
                 title={inboxMode === 'chats' ? 'Nova Mensagem' : 'Voltar para Inbox'}
               >
-                {inboxMode === 'chats' ? <PlusMessageSquare className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                {inboxMode === 'chats' ? <MessageSquarePlus className="w-4 h-4" /> : <X className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -880,7 +874,7 @@ export default function Inbox() {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              )}
 
               {/* Chat Status indicators (floating) */}
               {sending && (
