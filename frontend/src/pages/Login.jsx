@@ -191,7 +191,7 @@ export default function Login() {
                 <div className="wise-spinner w-4 h-4" style={{ borderTopColor: '#000' }} />
               ) : (
                 <>
-                  {isRegister ? 'Criar minha conta' : 'Entrar no sistema'}
+                  <span>{isRegister ? 'Criar minha conta' : 'Entrar no sistema'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
