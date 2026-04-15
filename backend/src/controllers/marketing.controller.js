@@ -9,7 +9,7 @@ exports.connectMetaAds = (req, res) => {
   // Gerar um state token com JWT para segurança contra CSRF e para passar o userId
   const state = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
   const appId = process.env.META_APP_ID;
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+  const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
   const redirectUri = `${backendUrl}/api/marketing/meta/callback`;
   
   const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=ads_management,ads_read`;
@@ -20,7 +20,7 @@ exports.connectGoogleAds = (req, res) => {
   const userId = req.user.userId;
   const state = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+  const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
   const redirectUri = `${backendUrl}/api/marketing/google/callback`;
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=https://www.googleapis.com/auth/adwords&state=${state}&access_type=offline&prompt=consent`;
@@ -159,7 +159,7 @@ exports.metaCallback = async (req, res) => {
     // 2. Exchange Code for Token
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
     const redirectUri = `${backendUrl}/api/marketing/meta/callback`;
 
     const tokenRes = await axios.get(`https://graph.facebook.com/v19.0/oauth/access_token`, {
@@ -202,7 +202,7 @@ exports.googleCallback = async (req, res) => {
     // 2. Exchange Code for Token
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
     const redirectUri = `${backendUrl}/api/marketing/google/callback`;
 
     const tokenRes = await axios.post(`https://oauth2.googleapis.com/token`, {
