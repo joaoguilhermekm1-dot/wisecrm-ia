@@ -1007,7 +1007,7 @@ export default function Inbox() {
                 <h4 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Estágio do Funil</h4>
               </div>
               <div className="space-y-1">
-                {fullLeadData?.pipeline?.stages && JSON.parse(fullLeadData.pipeline.stages).map((stage) => (
+                {fullLeadData?.pipeline?.stages && (Array.isArray(fullLeadData.pipeline.stages) ? fullLeadData.pipeline.stages : []).map((stage) => (
                   <button 
                     key={stage}
                     onClick={() => handleUpdateStatus(stage)}
