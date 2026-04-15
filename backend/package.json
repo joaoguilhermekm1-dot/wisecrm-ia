@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "build": "npx prisma generate && npx prisma db push",
     "dev": "nodemon src/index.js"
   },
   "dependencies": {
