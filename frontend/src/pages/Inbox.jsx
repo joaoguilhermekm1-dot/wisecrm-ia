@@ -341,6 +341,13 @@ export default function Inbox() {
   const [inboxMode, setInboxMode] = useState('chats'); // 'chats' | 'contacts'
   const [allLeads, setAllLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  
+  // Side Panel state
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const [fullLeadData, setFullLeadData] = useState(null);
+  const [loadingFullLead, setLoadingFullLead] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
 
   // Image preview state
   const [pendingImage, setPendingImage] = useState(null); // { file, previewUrl }
@@ -482,6 +489,19 @@ export default function Inbox() {
     if (inboxMode === 'contacts') fetchAllLeads();
   }, [inboxMode]);
 
+  const fetchFullLead = async (id) => {
+    setLoadingFullLead(true);
+    try {
+      const { data } = await leadsApi.getFull(id);
+      setFullLeadData(data);
+      setNoteInput(data.notes || '');
+    } catch (err) {
+      console.error('Erro ao buscar lead completo', err);
+    } finally {
+      setLoadingFullLead(false);
+    }
+  };
+
   useEffect(() => {
     if (!activeConv) return;
     const fetchHistory = async () => {
@@ -491,6 +511,9 @@ export default function Inbox() {
         scrollToBottom();
         setAiDecision(null);
         setPendingImage(null);
+        
+        // Se o painel estiver aberto, atualiza os dados do lead
+        if (showInfoPanel) fetchFullLead(activeConv.leadId);
       } catch (err) {
         console.error('Erro ao buscar histórico', err);
       }
@@ -498,7 +521,30 @@ export default function Inbox() {
     fetchHistory();
     fetchSmartTemplates(activeConv.leadId);
     setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, unreadCount: 0 } : c));
-  }, [activeConv?.id]);
+  }, [activeConv?.id, showInfoPanel]);
+
+  const handleUpdateStatus = async (newStatus) => {
+    if (!fullLeadData) return;
+    try {
+      await leadsApi.update(fullLeadData.id, { status: newStatus });
+      setFullLeadData(prev => ({ ...prev, status: newStatus }));
+      // Atualizar no local list
+      setConversations(prev => prev.map(c => c.leadId === fullLeadData.id ? { ...c, lead: { ...c.lead, status: newStatus } } : c));
+    } catch (err) {
+      alert('Erro ao atualizar estágio');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!fullLeadData) return;
+    try {
+      await leadsApi.update(fullLeadData.id, { notes: noteInput });
+      setFullLeadData(prev => ({ ...prev, notes: noteInput }));
+      setEditingNotes(false);
+    } catch (err) {
+      alert('Erro ao salvar notas');
+    }
+  };
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -755,21 +801,14 @@ export default function Inbox() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-5">
-                <div className="text-right">
-                  <p className="text-[9px] font-bold text-[#6B6860] uppercase">Temperatura</p>
-                  <div className="flex items-center gap-1 justify-end">
-                    <Thermometer className="w-3 h-3 text-[#FAD485]" />
-                    <span className="text-xs font-black text-white">{activeConv.lead.temperature || 0}%</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-bold text-[#6B6860] uppercase">Probabilidade</p>
-                  <div className="flex items-center gap-1 justify-end">
-                    <TrendingUp className="w-3 h-3 text-green-400" />
-                    <span className="text-xs font-black text-white">{activeConv.lead.probability || 0}%</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowInfoPanel(!showInfoPanel)}
+                  className={`p-2 rounded-lg transition-all ${showInfoPanel ? 'bg-[#FAD485] text-black' : 'hover:bg-white/5 text-[#6B6860]'}`}
+                  title="Painel do Lead"
+                >
+                  <Tag className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -851,19 +890,6 @@ export default function Inbox() {
                     <span className="text-[9px] text-[#6B6860] uppercase font-black tracking-widest">Enviando...</span>
                   </div>
                 </div>
-              )}ame="text-[10px] text-white/40">{aiDecision.strategy?.objetivo}</p>
-                    <div className="flex gap-2">
-                      <button onClick={() => setMsgInput(aiDecision.suggestedResponse)}
-                        className="px-3 py-1.5 rounded-lg border border-[#FAD485]/20 text-[#FAD485] text-[10px] font-bold hover:bg-[#FAD485]/05 transition-all">
-                        Editar
-                      </button>
-                      <button onClick={() => handleSendMessage(aiDecision.suggestedResponse)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAD485] text-black hover:bg-[#F5C842] transition-all font-bold text-[10px] uppercase">
-                        Aprovar e Enviar <ChevronRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
               )}
 
               {/* Input Box */}
@@ -934,15 +960,120 @@ export default function Inbox() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center opacity-30">
-              <MessageSquare className="w-12 h-12 mx-auto mb-4" />
-              <p className="text-sm font-medium text-white">Selecione uma conversa</p>
-              <p className="text-xs mt-1" style={{ color: '#6B6860' }}>para iniciar o atendimento com Alanis IA</p>
-            </div>
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+            <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+            <p className="text-sm font-medium text-white">Selecione uma conversa</p>
+            <p className="text-xs mt-1" style={{ color: '#6B6860' }}>para iniciar o atendimento com Alanis IA</p>
           </div>
         )}
       </div>
+
+      {/* CRM Side Panel (Right) */}
+      {showInfoPanel && activeConv && (
+        <div className="w-80 shrink-0 flex flex-col bg-[#060604] border-l border-white/5 animate-slide-left overflow-y-auto scrollbar-premium">
+          <div className="p-5 border-b border-white/5 bg-black/40 backdrop-blur-md sticky top-0 z-10">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FAD485]">Painel de Vendas</h3>
+              <button onClick={() => setShowInfoPanel(false)} className="p-1 rounded-lg hover:bg-white/5 text-[#6B6860]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm font-bold text-white truncate">{activeConv.lead.name}</p>
+          </div>
+
+          <div className="p-5 space-y-8 animate-fade-in">
+            {/* Sales Metrics */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <p className="text-[9px] font-black text-[#6B6860] uppercase mb-1">Temperatura</p>
+                <div className="flex items-center gap-2">
+                  <Thermometer className="w-3.5 h-3.5 text-[#FAD485]" />
+                  <span className="text-sm font-black text-white">{activeConv.lead.temperature || 0}%</span>
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                <p className="text-[9px] font-black text-[#6B6860] uppercase mb-1">Probabilidade</p>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+                  <span className="text-sm font-black text-white">{activeConv.lead.probability || 0}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pipeline Stage */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-[#FAD485]" />
+                <h4 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Estágio do Funil</h4>
+              </div>
+              <div className="space-y-1">
+                {fullLeadData?.pipeline?.stages && JSON.parse(fullLeadData.pipeline.stages).map((stage) => (
+                  <button 
+                    key={stage}
+                    onClick={() => handleUpdateStatus(stage)}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                      fullLeadData.status === stage 
+                      ? 'bg-[#FAD485]/10 border-[#FAD485] text-[#FAD485]' 
+                      : 'bg-white/[0.02] border-white/5 text-[#6B6860] hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {stage}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Profile AI (DISC) */}
+            {fullLeadData?.memory && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit className="w-3.5 h-3.5 text-[#FAD485]" />
+                  <h4 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Perfil Comportamental</h4>
+                </div>
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#FAD485]/5 to-transparent border border-[#FAD485]/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#FAD485] text-black uppercase">
+                      DISC: {fullLeadData.memory.disc || 'Identificando...'}
+                    </span>
+                    <span className="text-[9px] text-[#6B6860] uppercase font-bold">{fullLeadData.memory.toneStyle}</span>
+                  </div>
+                  <p className="text-[11px] text-white/70 leading-relaxed italic">
+                    {fullLeadData.memory.summary || "Alanis ainda está perfilando o comportamento deste lead..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Internal Notes */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-[#FAD485]" />
+                  <h4 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Notas Internas</h4>
+                </div>
+                {!editingNotes ? (
+                  <button onClick={() => setEditingNotes(true)} className="text-[9px] font-black text-[#FAD485] hover:underline uppercase">Editar</button>
+                ) : (
+                  <button onClick={handleSaveNotes} className="text-[9px] font-black text-green-400 hover:underline uppercase">Salvar</button>
+                )}
+              </div>
+              
+              {editingNotes ? (
+                <textarea 
+                  className="w-full h-32 bg-black/40 border border-white/10 rounded-2xl p-3 text-xs text-white outline-none focus:border-[#FAD485]/50 transition-all resize-none"
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  placeholder="Escreva notas importantes sobre o lead..."
+                />
+              ) : (
+                <div className="min-h-[60px] p-3 rounded-2xl bg-white/[0.02] border border-white/5 text-[11px] text-[#6B6860] italic whitespace-pre-wrap">
+                  {fullLeadData?.notes || "Nenhuma nota manual adicionada."}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
