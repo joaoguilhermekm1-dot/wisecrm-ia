@@ -139,6 +139,25 @@ exports.getLeads = async (req, res) => {
   }
 };
 
+exports.getLeadFull = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: {
+        pipeline: true,
+        memory: true,
+      }
+    });
+
+    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+    res.json(lead);
+  } catch (err) {
+    console.error('[Leads Controller] Error fetching full lead:', err);
+    res.status(500).json({ error: 'Erro ao buscar detalhes do lead.' });
+  }
+};
+
 exports.updateLead = async (req, res) => {
   const { id } = req.params;
   const { name, email, phone, status, source, notes } = req.body;

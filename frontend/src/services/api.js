@@ -54,6 +54,7 @@ export const leadsApi = {
   create: (data) => api.post('/leads', data),
   batchCreate: (leads) => api.post('/leads/batch', { leads }),
   update: (id, data) => api.patch(`/leads/${id}`, data),
+  getFull: (id) => api.get(`/leads/${id}/full`),
   delete: (id) => api.delete(`/leads/${id}`),
 };
 

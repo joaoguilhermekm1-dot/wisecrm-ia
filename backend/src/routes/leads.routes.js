@@ -6,7 +6,8 @@ const authMiddleware = require('../middlewares/auth.middleware');
 router.use(authMiddleware);
 
 router.get('/conversations', leadsController.getConversations);
-router.get('/', leadsController.getLeads);
+router.get('/:id', leadsController.getLeads);
+router.get('/:id/full', leadsController.getLeadFull);
 router.post('/', leadsController.createLead);
 router.post('/batch', leadsController.createLeadsBatch);
 router.patch('/:id', leadsController.updateLead);
