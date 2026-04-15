@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: wise_crm_db
+    environment:
+      POSTGRES_USER: wise_user
+      POSTGRES_PASSWORD: wise_password123
+      POSTGRES_DB: wise_crm_prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wise_user -d wise_crm_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wise_crm_backend
+    environment:
+      - DATABASE_URL=postgresql://wise_user:wise_password123@db:5432/wise_crm_prod?schema=public
+      - JWT_SECRET=wise_super_secret_key_2026_premium
+      - PORT=3001
+      - APIFY_TOKEN=${APIFY_TOKEN}
+      - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
+      - META_APP_ID=${META_APP_ID}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wise_crm_frontend
+    environment:
+      - VITE_API_URL=http://localhost:3001/api
+      - VITE_META_APP_ID=${META_APP_ID}
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String?
+  passwordHash String
+  role         Role          @default(USER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  integrations Integration[]
+  leads        Lead[]
+  pipelines    Pipeline[]
+  processes    Process[]
+  adMetrics    AdMetric[]
+  adCampaignMetrics AdCampaignMetric[]
+  adCreativeMetrics AdCreativeMetric[]
+}
+
+model Integration {
+  id           String          @id @default(uuid())
+  type         IntegrationType
+  accessToken  String?
+  refreshToken String?
+  status       String          @default("DISCONNECTED")
+  metadata     Json?
+  userId       String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  user         User            @relation(fields: [userId], references: [id])
+
+  @@unique([type, userId])
+}
+
+model Lead {
+  id                String         @id @default(uuid())
+  name              String
+  email             String?
+  phone             String?
+  whatsappJid       String?        @unique
+  source            String?
+  status            String         @default("NEW")
+  temperature       Int            @default(0) // 0-100: frio, morno, quente
+  probability       Int            @default(0) // 0-100: probabilidade de compra
+  consciousness     String?        // baixo, médio, alto
+  summary           String?        // Resumo da IA em 1 frase
+  notes             String?        // Notas internas manuais
+  tags              String[]       @default([])
+  lastInteractionAt DateTime       @default(now())
+  pipelineId        String
+  ownerId           String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  metadata          Json?
+  owner             User           @relation(fields: [ownerId], references: [id])
+  pipeline          Pipeline       @relation(fields: [pipelineId], references: [id])
+  messages          Message[]
+  conversations     Conversation[]
+  memory            LeadMemory?
+}
+
+model LeadMemory {
+  id           String   @id @default(uuid())
+  leadId       String   @unique
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  disc         String?        // D (Dominante), I (Influente), S (Estável), C (Cauteloso)
+  toneStyle    String?        // formal, casual, direto, empático, técnico
+  pace         String?        // rápido, moderado, lento
+  objections   String[]  @default([])   // objeções já levantadas
+  hooks        String[]  @default([])   // o que ressoou/funcionou com o lead
+  painPoints   String[]  @default([])   // dores identificadas
+  desires      String[]  @default([])   // desejos e objetivos do lead
+  summary      String?        // resumo acumulado do perfil comportamental
+  interactions Int       @default(0)    // total de iterações com a IA
+  lastAnalysis Json?          // última análise completa do agente
+  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime  @default(now())
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  jid           String   @unique
+  lastMessage   String?
+  unreadCount   Int      @default(0)
+  platform      String   @default("whatsapp")
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id])
+  messages      Message[]
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  content        String
+  sender         String        // 'user', 'lead', 'ai'
+  type           String?       // 'text', 'audio', 'image'
+  leadId         String
+  conversationId String?
+  createdAt      DateTime      @default(now())
+  lead           Lead          @relation(fields: [leadId], references: [id])
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+}
+
+model Pipeline {
+  id        String    @id @default(uuid())
+  name      String
+  stages    Json
+  userId    String
+  createdAt DateTime  @default(now())
+  leads     Lead[]
+  user      User      @relation(fields: [userId], references: [id])
+  processes Process[]
+}
+
+model AdMetric {
+  id           String   @id @default(uuid())
+  date         DateTime
+  clicks       Int      @default(0)
+  impressions  Int      @default(0)
+  spend        Float    @default(0)
+  reach        Int      @default(0)
+  cpc          Float    @default(0)
+  cpm          Float    @default(0)
+  ctr          Float    @default(0)
+  accountId    String
+  accountName  String?
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([date, accountId, userId])
+}
+
+model AdCampaignMetric {
+  id           String   @id @default(uuid())
+  date         DateTime
+  clicks       Int      @default(0)
+  impressions  Int      @default(0)
+  spend        Float    @default(0)
+  reach        Int      @default(0)
+  cpc          Float    @default(0)
+  cpm          Float    @default(0)
+  ctr          Float    @default(0)
+  campaignId   String
+  campaignName String?
+  status       String?
+  accountId    String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([date, campaignId, accountId, userId])
+}
+
+model AdCreativeMetric {
+  id           String   @id @default(uuid())
+  date         DateTime
+  clicks       Int      @default(0)
+  impressions  Int      @default(0)
+  spend        Float    @default(0)
+  reach        Int      @default(0)
+  cpc          Float    @default(0)
+  cpm          Float    @default(0)
+  ctr          Float    @default(0)
+  adId         String
+  adName       String?
+  campaignName String?  // Reference to parent campaign name for the UI
+  status       String?
+  accountId    String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([date, adId, accountId, userId])
+}
+
+model Process {
+  id          String       @id @default(uuid())
+  name        String
+  graphData   Json
+  isActive    Boolean      @default(true)
+  pipelineId  String?
+  userId      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  automations Automation[]
+  pipeline    Pipeline?    @relation(fields: [pipelineId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+}
+
+model Automation {
+  id        String   @id @default(uuid())
+  nodeId    String
+  type      String
+  config    Json
+  processId String
+  createdAt DateTime @default(now())
+  process   Process  @relation(fields: [processId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum IntegrationType {
+  META
+  GOOGLE
+  WHATSAPP
+}

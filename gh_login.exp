@@ -1,0 +1,12 @@
+set timeout -1
+spawn ./gh auth login
+expect "What account do you want to log into"
+send "\r"
+expect "What is your preferred protocol for Git operations"
+send "\r"
+expect "Authenticate Git with your GitHub credentials"
+send "Y\r"
+expect "How would you like to authenticate GitHub CLI"
+send "\r"
+expect "First copy your one-time code:"
+interact
