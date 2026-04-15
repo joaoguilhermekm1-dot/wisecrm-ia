@@ -142,17 +142,26 @@ class WhatsAppService {
       let jid = target;
       if (!target.includes('@')) {
         let cleanPhone = target.replace(/\D/g, '');
+        
+        // CORREÇÃO DO 9º DÍGITO & PREFIXO (BRASIL)
+        // Se o número começa com 1 a 9 e tem 10 ou 11 dígitos, provavelmente falta o 55
+        if (cleanPhone.length >= 10 && cleanPhone.length <= 11 && !cleanPhone.startsWith('55')) {
+          cleanPhone = '55' + cleanPhone;
+        }
+
         jid = `${cleanPhone}@s.whatsapp.net`;
         
-        // CORREÇÃO DO 9º DÍGITO (BRASIL): Verificar se o JID canônico oficial difere do nosso chute
+        // Validação Real no Servidor do WhatsApp
         try {
           const [result] = await this.sock.onWhatsApp(cleanPhone);
           if (result && result.exists) {
             jid = result.jid;
-            console.log(`[WhatsApp] JID validado: ${cleanPhone} -> ${jid}`);
+            console.log(`[WhatsApp] JID validado com sucesso: ${cleanPhone} -> ${jid}`);
+          } else {
+            console.warn(`[WhatsApp] Número ${cleanPhone} não parece existir no WA. Tentando envio forçado.`);
           }
         } catch (e) {
-          console.warn('[WhatsApp] Erro ao validar JID no servidor, tentando forçado...', e.message);
+          console.warn('[WhatsApp] Erro na pré-validação do JID:', e.message);
         }
       }
       
@@ -185,10 +194,18 @@ class WhatsAppService {
 
       if (!user) return null;
 
-      const cleanPhone = jid.split('@')[0].replace(/\D/g, '');
+      const fullPhone = jid.split('@')[0].replace(/\D/g, '');
+      const shortPhone = fullPhone.startsWith('55') ? fullPhone.slice(2) : fullPhone;
 
       let lead = await prisma.lead.findFirst({
-        where: { OR: [{ whatsappJid: jid }, { phone: cleanPhone }], ownerId: user.id }
+        where: { 
+          OR: [
+            { whatsappJid: jid }, 
+            { phone: fullPhone },
+            { phone: shortPhone }
+          ], 
+          ownerId: user.id 
+        }
       });
 
       if (!lead) {

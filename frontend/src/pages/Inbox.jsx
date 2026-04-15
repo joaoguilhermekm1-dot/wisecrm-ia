@@ -59,76 +59,6 @@ function ConversationItem({ conv, active, onClick }) {
   );
 }
 
-// ── New Chat Modal ─────────────────────────────────────────────────────────
-function NewChatModal({ onClose, onSelect }) {
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const { data } = await leadsApi.getAll();
-        setLeads(data);
-      } catch (err) {
-        console.error('Erro ao buscar leads:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLeads();
-  }, []);
-
-  const filtered = leads.filter(l => l.name?.toLowerCase().includes(search.toLowerCase()) || l.phone?.includes(search));
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-[#0A0A07] border border-[#FAD485]/20 rounded-2xl shadow-2xl flex flex-col max-h-[80vh] animate-slide-up">
-        <div className="p-4 border-b border-[#FAD485]/10 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-[#FAD485]" />
-            <h3 className="text-white font-black uppercase tracking-wider text-sm">Nova Conversa</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-[#6B6860] transition-colors text-white">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-4 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-2 bg-black/30 border border-white/10 px-3 py-2 rounded-xl">
-            <Search className="w-4 h-4 text-[#6B6860]" />
-            <input 
-              type="text" 
-              placeholder="Pesquisar contatos..." 
-              className="bg-transparent border-none outline-none text-sm text-white flex-1"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-2 scrollbar-premium">
-          {loading ? (
-            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-[#FAD485] animate-spin" /></div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center py-8 text-[#6B6860] text-sm">Nenhum contato encontrado.</p>
-          ) : (
-            filtered.map(lead => (
-              <button key={lead.id} onClick={() => onSelect(lead)} className="w-full text-left p-3 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors border-b border-white/5 last:border-0 group">
-                <div className="w-10 h-10 rounded-full bg-[#FAD485]/10 flex items-center justify-center text-[#FAD485] font-black uppercase shrink-0">
-                  {lead.name?.charAt(0) || '?'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white truncate group-hover:text-[#FAD485] transition-colors">{lead.name}</p>
-                  <p className="text-xs text-[#6B6860] truncate">{lead.phone || lead.whatsappJid || 'Sem número'}</p>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-1 bg-white/5 text-[#6B6860] rounded-lg group-hover:bg-[#FAD485]/10 group-hover:text-[#FAD485] transition-colors">
-                  {lead.pipeline?.name || lead.status}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );
@@ -408,7 +338,9 @@ export default function Inbox() {
   const [status, setStatus] = useState('DISCONNECTED');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAudioRecorder, setShowAudioRecorder] = useState(false);
-  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [inboxMode, setInboxMode] = useState('chats'); // 'chats' | 'contacts'
+  const [allLeads, setAllLeads] = useState([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
 
   // Image preview state
   const [pendingImage, setPendingImage] = useState(null); // { file, previewUrl }
@@ -512,8 +444,20 @@ export default function Inbox() {
     }
   };
 
+  const fetchAllLeads = async () => {
+    setLoadingLeads(true);
+    try {
+      const { data } = await leadsApi.getAll();
+      setAllLeads(data);
+    } catch (err) {
+      console.error('Erro ao buscar todos os leads', err);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
   const startNewChat = (lead) => {
-    setShowNewChatModal(false);
+    setInboxMode('chats');
     // Verificar se já existe na lista atual
     const existingConv = conversations.find(c => c.leadId === lead.id);
     if (existingConv) {
@@ -522,7 +466,7 @@ export default function Inbox() {
       // Criar conversa simulada até a primeira mensagem
       const simulatedConv = {
         id: `virtual_${lead.id}`,
-        jid: lead.phone || lead.whatsappJid || '',
+        jid: lead.whatsappJid || lead.phone || '',
         unreadCount: 0,
         updatedAt: new Date().toISOString(),
         leadId: lead.id,
@@ -533,6 +477,10 @@ export default function Inbox() {
       setActiveConv(simulatedConv);
     }
   };
+
+  useEffect(() => {
+    if (inboxMode === 'contacts') fetchAllLeads();
+  }, [inboxMode]);
 
   useEffect(() => {
     if (!activeConv) return;
@@ -684,30 +632,36 @@ export default function Inbox() {
       style={{ border: '1px solid rgba(250,212,133,0.08)' }}>
 
       {/* Sidebar */}
-      <div className="w-80 shrink-0 flex flex-col" style={{ background: '#060604', borderRight: '1px solid rgba(250,212,133,0.06)' }}>
+      <div className="w-80 shrink-0 flex flex-col relative" style={{ background: '#060604', borderRight: '1px solid rgba(250,212,133,0.06)' }}>
+        
+        {/* Sidebar Header */}
         <div className="px-5 py-4 space-y-4" style={{ borderBottom: '1px solid rgba(250,212,133,0.06)' }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-black text-white uppercase tracking-wider">Inbox</h2>
-            <div className="flex items-center gap-1.5">
-              {status === 'CONNECTED'
-                ? <Wifi className="w-3.5 h-3.5 text-green-400" />
-                : <WifiOff className="w-3.5 h-3.5 text-red-400" />
-              }
-              <div className={`w-1.5 h-1.5 rounded-full ${status === 'CONNECTED' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`} />
+            <h2 className="text-sm font-black text-white uppercase tracking-wider">
+              {inboxMode === 'chats' ? 'Inbox' : 'Seus Contatos'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 mr-2">
+                {status === 'CONNECTED'
+                  ? <Wifi className="w-3 h-3 text-green-400" />
+                  : <WifiOff className="w-3 h-3 text-red-400" />
+                }
+              </div>
+              <button 
+                onClick={() => setInboxMode(inboxMode === 'chats' ? 'contacts' : 'chats')}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-[#FAD485] transition-all"
+                title={inboxMode === 'chats' ? 'Nova Mensagem' : 'Voltar para Inbox'}
+              >
+                {inboxMode === 'chats' ? <PlusMessageSquare className="w-4 h-4" /> : <X className="w-4 h-4" />}
+              </button>
             </div>
           </div>
-
-          <button onClick={() => setShowNewChatModal(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#FAD485]/10 text-[#FAD485] hover:bg-[#FAD485]/20 border border-[#FAD485]/20 transition-all group">
-            <PlusMessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-wider">Nova Conversa</span>
-          </button>
 
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(250,212,133,0.03)', border: '1px solid rgba(250,212,133,0.08)' }}>
             <Search className="w-3.5 h-3.5" style={{ color: '#4A4840' }} />
             <input
               type="text"
-              placeholder="Buscar conversa..."
+              placeholder={inboxMode === 'chats' ? "Buscar conversa..." : "Buscar contato no funil..."}
               className="bg-transparent border-none text-[11px] outline-none text-white w-full"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -715,23 +669,61 @@ export default function Inbox() {
           </div>
         </div>
 
+        {/* Sidebar Content */}
         <div className="flex-1 overflow-y-auto scrollbar-premium">
-          {loading ? (
-            <div className="flex justify-center p-8"><div className="wise-spinner" /></div>
-          ) : filteredConversations.length === 0 ? (
-            <div className="p-8 text-center">
-              <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-20" />
-              <p className="text-xs opacity-50 text-[#6B6860]">Nenhuma conversa ativa</p>
-            </div>
+          {inboxMode === 'chats' ? (
+            loading ? (
+              <div className="flex justify-center p-8"><div className="wise-spinner" /></div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="p-8 text-center">
+                <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                <p className="text-xs opacity-50 text-[#6B6860]">Nenhuma conversa ativa</p>
+              </div>
+            ) : (
+              filteredConversations.map(conv => (
+                <ConversationItem
+                  key={conv.id}
+                  conv={conv}
+                  active={activeConv?.id === conv.id}
+                  onClick={() => setActiveConv(conv)}
+                />
+              ))
+            )
           ) : (
-            filteredConversations.map(conv => (
-              <ConversationItem
-                key={conv.id}
-                conv={conv}
-                active={activeConv?.id === conv.id}
-                onClick={() => setActiveConv(conv)}
-              />
-            ))
+            loadingLeads ? (
+              <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 text-[#FAD485] animate-spin" /></div>
+            ) : allLeads.filter(l => 
+                l.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                l.phone?.includes(searchTerm) || 
+                l.whatsappJid?.includes(searchTerm)
+              ).length === 0 ? (
+              <div className="p-8 text-center">
+                <Users className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                <p className="text-xs opacity-50 text-[#6B6860]">Nenhum lead encontrado</p>
+              </div>
+            ) : (
+              allLeads
+                .filter(l => 
+                  l.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  l.phone?.includes(searchTerm) || 
+                  l.whatsappJid?.includes(searchTerm)
+                )
+                .map(lead => (
+                  <button 
+                    key={lead.id} 
+                    onClick={() => startNewChat(lead)}
+                    className="w-full text-left px-4 py-3 hover:bg-white/5 transition-all flex items-center gap-3 border-b border-white/5"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[#FAD485]/10 flex items-center justify-center text-[#FAD485] font-black text-sm uppercase">
+                      {lead.name?.charAt(0) || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{lead.name}</p>
+                      <p className="text-[10px]" style={{ color: '#6B6860' }}>{lead.status}</p>
+                    </div>
+                  </button>
+                ))
+            )
           )}
         </div>
       </div>
@@ -792,57 +784,74 @@ export default function Inbox() {
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="px-5 pb-5 shrink-0 space-y-3">
-
-              {/* Image Preview Panel */}
-              {pendingImage && (
-                <ImagePreview
-                  file={pendingImage.file}
-                  previewUrl={pendingImage.previewUrl}
-                  onSend={handleConfirmSendImage}
-                  onCancel={handleCancelPendingImage}
-                  sending={uploadingImage}
-                />
-              )}
-
-              {/* Templates Panel */}
-              {showTemplates && !pendingImage && (
-                <TemplateSelector
-                  templates={smartTemplates}
-                  loading={loadingTemplates}
-                  onSelect={(text) => setMsgInput(text)}
-                  onClose={() => setShowTemplates(false)}
-                />
-              )}
-
-              {/* AI Decision Panel */}
+                      {/* AI Decision Panel - Premium Edition */}
               {aiDecision && !pendingImage && (
-                <div className="p-4 rounded-2xl border border-[#FAD485]/20 animate-slide-up space-y-3"
-                  style={{ background: 'rgba(250,212,133,0.03)' }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#FAD485]" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#FAD485]">Alanis — SDR IA</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20">
-                        <Zap className="w-2.5 h-2.5 text-green-400" />
-                        <span className="text-[9px] font-bold text-green-400 uppercase">{aiDecision.strategy?.proxima_acao}</span>
+                <div className="mx-5 mb-3 p-5 rounded-3xl border border-[#FAD485]/20 animate-slide-up relative overflow-hidden group shadow-2xl"
+                  style={{ background: 'rgba(10,10,7,0.95)', backdropFilter: 'blur(20px)' }}>
+                  
+                  {/* Decorative background glow */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#FAD485]/5 blur-[60px] rounded-full -mr-16 -mt-16 pointer-events-none" />
+                  
+                  <div className="relative z-10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#FAD485]/10 flex items-center justify-center shadow-inner">
+                          <Sparkles className="w-4 h-4 text-[#FAD485] animate-pulse" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FAD485]/80 block">Alanis SDR</span>
+                          <span className="text-[9px] text-[#6B6860] uppercase font-bold">Sugestão Humanizada</span>
+                        </div>
                       </div>
-                      <button onClick={() => setAiDecision(null)} className="p-1 rounded-lg hover:bg-white/5 text-[#6B6860]">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+                          <div className="w-1 h-1 rounded-full bg-green-400" />
+                          <span className="text-[9px] font-black text-green-400 uppercase tracking-wider">{aiDecision.strategy?.proxima_acao || 'Ação'}</span>
+                        </div>
+                        <button onClick={() => setAiDecision(null)} className="p-1 rounded-lg hover:bg-white/5 text-[#6B6860] transition-all hover:rotate-90">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#FAD485] to-transparent opacity-30 rounded-full" />
+                      <p className="text-[13px] text-white/90 leading-relaxed font-medium italic pl-4">
+                        "{aiDecision.suggestedResponse}"
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                      <div className="flex items-center gap-2">
+                        <BrainCircuit className="w-3.5 h-3.5 text-[#6B6860]" />
+                        <p className="text-[10px] text-[#6B6860] font-medium italic max-w-[200px] truncate">
+                          {aiDecision.strategy?.objetivo || 'Aumentar conexão'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMsgInput(aiDecision.suggestedResponse)}
+                          className="px-4 py-2 rounded-xl bg-white/5 text-white/80 text-[10px] font-black hover:bg-white/10 transition-all uppercase tracking-wider">
+                          Personalizar
+                        </button>
+                        <button onClick={() => handleSendMessage(aiDecision.suggestedResponse)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FAD485] to-[#F5C842] text-black hover:scale-105 active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider shadow-[0_4px_15px_rgba(250,212,133,0.3)]">
+                          Enviar Agora <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                </div>
+              ) : null}
 
-                  <p className="text-xs text-white leading-relaxed italic">"{aiDecision.suggestedResponse}"</p>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                    <p className="text-[10px] text-white/40">{aiDecision.strategy?.objetivo}</p>
+              {/* Chat Status indicators (floating) */}
+              {sending && (
+                <div className="flex justify-center mb-1">
+                  <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/5 flex items-center gap-2 animate-pulse">
+                    <Loader2 className="w-2.5 h-2.5 text-[#FAD485] animate-spin" />
+                    <span className="text-[9px] text-[#6B6860] uppercase font-black tracking-widest">Enviando...</span>
+                  </div>
+                </div>
+              )}ame="text-[10px] text-white/40">{aiDecision.strategy?.objetivo}</p>
                     <div className="flex gap-2">
                       <button onClick={() => setMsgInput(aiDecision.suggestedResponse)}
                         className="px-3 py-1.5 rounded-lg border border-[#FAD485]/20 text-[#FAD485] text-[10px] font-bold hover:bg-[#FAD485]/05 transition-all">
@@ -934,13 +943,6 @@ export default function Inbox() {
           </div>
         )}
       </div>
-
-      {showNewChatModal && (
-        <NewChatModal 
-          onClose={() => setShowNewChatModal(false)} 
-          onSelect={startNewChat} 
-        />
-      )}
     </div>
   );
 }
