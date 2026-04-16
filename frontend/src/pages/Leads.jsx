@@ -599,7 +599,11 @@ export default function Leads() {
   }, []);
 
   useEffect(() => {
-    fetchLeads();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchLeads();
+    };
+    init();
     connectSocket();
     socket.on('lead:update', (updatedLead) => {
       setLeads(prev => {
@@ -608,8 +612,14 @@ export default function Leads() {
         return [updatedLead, ...prev];
       });
     });
-    socket.on('message:new', () => fetchLeads(false));
-    return () => { socket.off('lead:update'); socket.off('message:new'); };
+    socket.on('message:new', () => {
+      if (isMounted) fetchLeads(false);
+    });
+    return () => { 
+      isMounted = false;
+      socket.off('lead:update'); 
+      socket.off('message:new'); 
+    };
   }, [fetchLeads]);
 
   // Drop handler — optimistic update
