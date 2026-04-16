@@ -225,7 +225,7 @@ function IntegrationCard({ name, description, colorClass, textColor, icon: Icon,
 // ── Main Component ───────────────────────────────────────────────────────
 export default function MarketingHub() {
   const [adAccounts, setAdAccounts] = useState([]);
-  const [selectedAccountId, setSelectedAccountId] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null); // { id: string, platform: 'META'|'GOOGLE' }
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -291,9 +291,11 @@ export default function MarketingHub() {
     try {
       const { data } = await marketingApi.getAdAccounts();
       setAdAccounts(data);
-      if (data.length > 0) setSelectedAccountId(data[0].id);
+      if (data.length > 0 && !selectedAccount) {
+        setSelectedAccount({ id: data[0].id, platform: data[0].platform });
+      }
     } catch (err) {}
-  }, []);
+  }, [selectedAccount]);
 
   useEffect(() => {
     fetchIntegrations();
@@ -307,13 +309,13 @@ export default function MarketingHub() {
   }, [activeTab, fetchWaStatus]);
 
   useEffect(() => {
-    if (selectedAccountId) fetchInsights();
-  }, [selectedAccountId, startDate, endDate]);
+    if (selectedAccount?.id) fetchInsights();
+  }, [selectedAccount, startDate, endDate]);
 
   const fetchInsights = async () => {
     setLoading(true);
     try {
-      const { data } = await marketingApi.getAdInsights(selectedAccountId, startDate, endDate);
+      const { data } = await marketingApi.getAdInsights(selectedAccount.id, selectedAccount.platform, startDate, endDate);
       setInsights(data);
     } catch (err) {
       console.error('Erro ao buscar métricas', err);
@@ -323,14 +325,14 @@ export default function MarketingHub() {
   };
 
   const handleSync = async () => {
-    if (!selectedAccountId) return;
+    if (!selectedAccount?.id) return;
     setSyncing(true);
     try {
-      const res = await marketingApi.syncAdInsights(selectedAccountId);
+      const res = await marketingApi.syncAdInsights(selectedAccount.id, selectedAccount.platform);
       showToast(res.data?.message || 'Métricas sincronizadas!', 'success');
       await fetchInsights();
     } catch (err) {
-      showToast(err.response?.data?.error || 'Falha ao sincronizar. Verifique a conexão com a Meta.', 'error');
+      showToast(err.response?.data?.error || 'Falha ao sincronizar. Verifique a conexão.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -388,7 +390,8 @@ export default function MarketingHub() {
 
     try {
       const { data } = await marketingApi.sendAdChat({
-        adAccountId: selectedAccountId,
+        adAccountId: selectedAccount.id,
+        platform: selectedAccount.platform,
         startDate,
         endDate,
         history: newChat
@@ -411,7 +414,8 @@ export default function MarketingHub() {
       setProcessingChat(true);
       try {
         const { data } = await marketingApi.sendAdChat({
-          adAccountId: selectedAccountId,
+          adAccountId: selectedAccount.id,
+          platform: selectedAccount.platform,
           startDate,
           endDate,
           history: [] // Sem histórico gera mensagem de abertura
@@ -574,7 +578,7 @@ export default function MarketingHub() {
       /* PERFORMANCE TAB */
       ) : loading ? (
         <div className="h-64 flex items-center justify-center"><div className="wise-spinner" /></div>
-      ) : !selectedAccountId ? (
+      ) : !selectedAccount ? (
         <div className="h-64 flex flex-col items-center justify-center gap-4 text-center">
           <div className="w-16 h-16 rounded-3xl flex items-center justify-center" style={{ background: 'rgba(250,212,133,0.05)', border: '1px solid rgba(250,212,133,0.1)' }}>
             <AlertCircle className="w-8 h-8 text-[#6B6860]" />
@@ -595,12 +599,15 @@ export default function MarketingHub() {
           <div className="flex flex-col md:flex-row items-center justify-between border-b border-white/5 pb-4 animate-fade-in gap-4">
             <div className="flex items-center gap-3">
               <select 
-                value={selectedAccountId || ''} 
-                onChange={e => setSelectedAccountId(e.target.value)}
+                value={selectedAccount?.id || ''} 
+                onChange={e => {
+                  const acc = adAccounts.find(a => a.id === e.target.value);
+                  if (acc) setSelectedAccount({ id: acc.id, platform: acc.platform });
+                }}
                 className="bg-[#0A0A07] border border-white/10 rounded-2xl px-4 py-2.5 text-sm font-bold text-white outline-none focus:border-[#FAD485]/40 transition-all"
               >
                 {adAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  <option key={acc.id} value={acc.id}>{acc.displayName || acc.name}</option>
                 ))}
               </select>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}

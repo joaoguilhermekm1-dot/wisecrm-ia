@@ -1,4 +1,14 @@
-const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
+const { 
+  makeWASocket, 
+  useMultiFileAuthState, 
+  DisconnectReason, 
+  fetchLatestBaileysVersion, 
+  Browsers,
+  downloadMediaMessage 
+} = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const pino = require('pino');
 const qrcode = require('qrcode');
 const { Boom } = require('@hapi/boom');
@@ -99,13 +109,32 @@ class WhatsAppService {
             const fromMe = msg.key.fromMe;
 
             let textContent = '';
-            if (msg.message.conversation) textContent = msg.message.conversation;
-            else if (msg.message.extendedTextMessage) textContent = msg.message.extendedTextMessage.text;
-            else if (msg.message.audioMessage) textContent = '🎵 Áudio';
-            else if (msg.message.imageMessage) textContent = '🖼️ Imagem';
+            let msgType = 'text';
+            let mediaPath = null;
 
-            if (textContent) {
-               await this.persistMessage(senderJid, pushName, textContent, fromMe);
+            const m = msg.message;
+            if (m.conversation) textContent = m.conversation;
+            else if (m.extendedTextMessage) textContent = m.extendedTextMessage.text;
+            else if (m.imageMessage) {
+              msgType = 'image';
+              textContent = m.imageMessage.caption || '🖼️ Imagem';
+              mediaPath = await this.downloadMedia(msg, 'image');
+            } else if (m.audioMessage) {
+              msgType = 'audio';
+              textContent = '🎵 Áudio';
+              mediaPath = await this.downloadMedia(msg, 'audio');
+            } else if (m.videoMessage) {
+              msgType = 'video';
+              textContent = m.videoMessage.caption || '📹 Vídeo';
+              mediaPath = await this.downloadMedia(msg, 'video');
+            } else if (m.documentMessage) {
+              msgType = 'document';
+              textContent = m.documentMessage.fileName || '📄 Documento';
+              mediaPath = await this.downloadMedia(msg, 'document');
+            }
+
+            if (textContent || mediaPath) {
+               await this.persistMessage(senderJid, pushName, textContent, fromMe, null, msgType, mediaPath);
             }
           }
         }
@@ -178,7 +207,7 @@ class WhatsAppService {
       }
       
       await this.sock.sendMessage(jid, messagePayload);
-      await this.persistMessage(jid, null, content || `[${type.toUpperCase()}]`, true);
+      await this.persistMessage(jid, null, content || `[${type.toUpperCase()}]`, true, null, type, mediaUrl);
     } catch (err) {
       console.error('[WhatsApp Send Error]', err);
       throw err;
@@ -247,7 +276,7 @@ class WhatsAppService {
     }
   }
 
-  async persistMessage(jid, name, content, fromMe, timestamp = null) {
+  async persistMessage(jid, name, content, fromMe, timestamp = null, type = 'text', mediaUrl = null) {
     if (!jid.endsWith('@s.whatsapp.net')) return;
 
     try {
@@ -258,9 +287,10 @@ class WhatsAppService {
 
       const message = await prisma.message.create({
         data: {
-          content,
+          content: content || '',
           sender: fromMe ? 'user' : 'lead',
-          type: content.includes('🎵') ? 'audio' : 'text',
+          type: type || 'text',
+          mediaUrl: mediaUrl, // Certifique-se que este campo existe no Prisma ou use content
           leadId: conv.leadId,
           conversationId: conv.id,
           createdAt
@@ -293,6 +323,47 @@ class WhatsAppService {
 
     } catch (err) {
       console.error('[WhatsApp Msg Sync Error]', err);
+    }
+  }
+
+  /**
+   * Faz o download de um anexo de mídia do WhatsApp
+   */
+  async downloadMedia(msg, type) {
+    try {
+      const buffer = await downloadMediaMessage(
+        msg,
+        'buffer',
+        {},
+        { 
+          logger: pino({ level: 'silent' }),
+          reuploadRequest: this.sock.updateMediaMessage
+        }
+      );
+
+      const extension = {
+        image: 'jpg',
+        video: 'mp4',
+        audio: 'mp3',
+        document: 'pdf'
+      }[type] || 'bin';
+
+      const filename = `${crypto.randomBytes(16).toString('hex')}.${extension}`;
+      const relativePath = `media/${filename}`;
+      const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+
+      // Garantir que diretório existe
+      const dir = path.dirname(absolutePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      fs.writeFileSync(absolutePath, buffer);
+      console.log(`[WhatsApp] Mídia salva: ${relativePath}`);
+      
+      // Retornar URL acessível
+      return `${process.env.BACKEND_URL || 'http://localhost:3001'}/uploads/${relativePath}`;
+    } catch (err) {
+      console.error('[WhatsApp Download Error]', err.message);
+      return null;
     }
   }
 

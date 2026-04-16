@@ -81,9 +81,9 @@ export const messagesApi = {
 // --- Marketing ---
 export const marketingApi = {
   getAdAccounts: () => api.get('/marketing/meta/accounts'),
-  getAdInsights: (adAccountId, startDate, endDate) => api.get('/marketing/ads/insights', { params: { adAccountId, startDate, endDate } }),
+  getAdInsights: (adAccountId, platform, startDate, endDate) => api.get('/marketing/ads/insights', { params: { adAccountId, platform, startDate, endDate } }),
   sendAdChat: (data) => api.post('/marketing/ads/chat', data),
-  syncAdInsights: (adAccountId) => api.post('/marketing/ads/sync', { adAccountId }),
+  syncAdInsights: (adAccountId, platform) => api.post('/marketing/ads/sync', { adAccountId, platform }),
   getSEOInsights: () => api.get('/marketing/seo/insights'),
   getMetaConnectUrl: () => api.get('/marketing/connect/meta'),
   getGoogleConnectUrl: () => api.get('/marketing/connect/google'),
