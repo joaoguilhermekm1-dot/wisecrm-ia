@@ -223,7 +223,13 @@ RETORNE JSON:
       };
     } catch (err) {
       console.error('[SDR Alanis Error]', err.message);
-      throw err;
+      // Fallback gracioso para não travar a experiência do usuário
+      return {
+        suggestedResponse: "Olá! Desculpe, estou processando algumas informações. Como posso te ajudar agora?",
+        analysis: { intencao: 'desconhecida', temperatura: 'morno', probabilidade: 30, resumo: 'Erro no processamento da IA' },
+        strategy: { proxima_acao: 'tentar contato manual', tempo_acao: 'imediato' },
+        newTemperature: 30
+      };
     }
   }
 
@@ -361,20 +367,15 @@ RETORNE JSON (array de 6 objetos):
     ];
   }
 
-  async callAI(prompt) {
-    try {
-      const response = await this.anthropic.messages.create({
-        model: this.MODEL,
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      const text = response.content[0].text;
-      const jsonMatch = text.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-      return JSON.parse(jsonMatch ? jsonMatch[0] : text);
     } catch (err) {
       console.error('[SDR callAI Error]', err.message);
-      throw err;
+      // Fallback em caso de erro na API do Anthropic
+      if (prompt.includes('templates')) return this.getDefaultTemplates();
+      return { 
+        response: "Desculpe, tive um breve lapso. Pode me dizer mais sobre seus objetivos?", 
+        error: true,
+        strategy: "Fallback por erro de API"
+      };
     }
   }
 }

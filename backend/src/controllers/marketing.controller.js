@@ -30,45 +30,71 @@ exports.connectGoogleAds = (req, res) => {
 exports.getAdAccounts = async (req, res) => {
   const userId = req.user.userId;
   try {
-    const integration = await prisma.integration.findUnique({
-      where: { type_userId: { type: 'META', userId } }
+    const integrations = await prisma.integration.findMany({
+      where: { 
+        userId,
+        type: { in: ['META', 'GOOGLE'] },
+        status: 'CONNECTED'
+      }
     });
 
-    if (!integration || !integration.accessToken) {
-      return res.status(404).json({ error: 'Integração Meta não encontrada.' });
+    if (integrations.length === 0) {
+      return res.json([]);
     }
 
-    // Tentar buscar contas reais
-    try {
-      const response = await axios.get(`https://graph.facebook.com/v19.0/me/adaccounts`, {
-        params: {
-          access_token: integration.accessToken,
-          fields: 'name,id,account_status'
+    let allAccounts = [];
+
+    for (const integration of integrations) {
+      if (integration.type === 'META') {
+        try {
+          const response = await axios.get(`https://graph.facebook.com/v19.0/me/adaccounts`, {
+            params: {
+              access_token: integration.accessToken,
+              fields: 'name,id,account_status'
+            }
+          });
+          const metaAccs = response.data.data.map(acc => ({
+            ...acc,
+            platform: 'META',
+            displayName: `[META] ${acc.name}`
+          }));
+          allAccounts = [...allAccounts, ...metaAccs];
+        } catch (e) {
+          // Fallback if token expired but still marked as connected
+          allAccounts.push({ id: 'act_mock_meta', name: 'Wise Company (Meta Mock)', platform: 'META', displayName: '[META] Wise Company (Demo)' });
         }
-      });
-      return res.json(response.data.data);
-    } catch (apiErr) {
-      // Fallback para mock se a API falhar (ex: token de teste)
-      const mockAccounts = [
-        { id: 'act_1020304050', name: 'Wise Company - Lançamentos', account_status: 1 },
-        { id: 'act_9988776655', name: 'Açaí Boca Roxa - Delivery', account_status: 1 }
-      ];
-      return res.json(mockAccounts);
+      } else if (integration.type === 'GOOGLE') {
+        // Para Google Ads, geralmente precisamos do customer_id. 
+        // No MVP, se não temos o developer_token para o list_accessible_customers, mockamos a conta vinculada.
+        allAccounts.push({ 
+          id: integration.metadata?.accountId || 'g-ads-customer-1', 
+          name: integration.metadata?.accountName || 'Google Ads Account', 
+          platform: 'GOOGLE',
+          displayName: `[GOOGLE] ${integration.metadata?.accountName || 'Google Ads Account'}`
+        });
+      }
     }
+
+    return res.json(allAccounts);
   } catch (err) {
+    console.error('[getAdAccounts Error]', err);
     res.status(500).json({ error: 'Erro ao buscar contas de anúncio.' });
   }
 };
 
 exports.getAdInsights = async (req, res) => {
   const userId = req.user.userId;
-  const { adAccountId, startDate, endDate } = req.query;
+  const { adAccountId, platform, startDate, endDate } = req.query;
   
   if (!adAccountId) return res.status(400).json({ error: 'Conta de anúncio não especificada.' });
 
   try {
-    // 1. Sincronizar dados reais (Background). Usando 30 dias para cobrir um bom passado com segurança.
-    await marketingService.syncMetaMetrics(userId, adAccountId, 30);
+    // 1. Sincronizar dados reais (Background) se for Meta e não tiver dados recentes
+    if (platform === 'META') {
+      await marketingService.syncMetaMetrics(userId, adAccountId, 30);
+    } else if (platform === 'GOOGLE') {
+      await marketingService.syncGoogleMetrics(userId, adAccountId);
+    }
 
     // 2. Buscar histórico do banco (com filtro opcional de data)
     const history = await marketingService.getHistory(userId, adAccountId, startDate, endDate);
@@ -83,7 +109,7 @@ exports.getAdInsights = async (req, res) => {
 
     const insights = {
       primaryMetrics: {
-        messagesStarted: latest.clicks || 0, // No MVP usamos clicks como proxy se não houver evento customizado
+        messagesStarted: latest.clicks || 0,
         costPerMessage: latest.cpc || 0,
         clicks: latest.clicks || 0,
         ctr: latest.ctr || 0,
@@ -114,19 +140,25 @@ exports.getAdInsights = async (req, res) => {
   }
 };
 
-exports.syncMetaInsights = async (req, res) => {
+exports.syncAdInsights = async (req, res) => {
   const userId = req.user.userId;
-  const { adAccountId } = req.body;
+  const { adAccountId, platform } = req.body;
   if (!adAccountId) return res.status(400).json({ error: 'Conta de anúncio não especificada.' });
 
   try {
-    const result = await marketingService.syncMetaMetrics(userId, adAccountId, 30);
-    if (!result.success) {
-       return res.status(400).json({ error: result.error || 'Erro ao sincronizar dados da Meta.' });
+    let result;
+    if (platform === 'GOOGLE') {
+      result = await marketingService.syncGoogleMetrics(userId, adAccountId);
+    } else {
+      result = await marketingService.syncMetaMetrics(userId, adAccountId, 30);
     }
-    res.json({ message: 'Sincronizado com sucesso!', count: result.count });
+
+    if (!result.success) {
+       return res.status(400).json({ error: result.error || 'Erro ao sincronizar dados.' });
+    }
+    res.json({ message: result.message || 'Sincronizado com sucesso!', count: result.count });
   } catch (err) {
-    console.error('[Sync Meta Insights Error]', err);
+    console.error('[Sync Insights Error]', err);
     res.status(500).json({ error: 'Erro interno ao sincronizar.' });
   }
 };

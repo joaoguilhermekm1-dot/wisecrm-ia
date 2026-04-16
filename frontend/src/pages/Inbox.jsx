@@ -631,21 +631,21 @@ export default function Inbox() {
 
           {msg.type === 'image' && (
             <div className="mb-2 rounded-lg overflow-hidden border border-white/10">
-              <img src={msg.content} alt="Imagem" className="max-w-full h-auto cursor-pointer rounded-lg max-h-64 object-cover"
-                onClick={() => window.open(msg.content)} />
+              <img src={msg.mediaUrl || msg.content} alt="Imagem" className="max-w-full h-auto cursor-pointer rounded-lg max-h-64 object-cover"
+                onClick={() => window.open(msg.mediaUrl || msg.content)} />
             </div>
           )}
 
           {msg.type === 'audio' && (
             <div className="flex items-center gap-3 py-1 min-w-[200px]">
               <Mic className="w-4 h-4 shrink-0 opacity-60" />
-              <audio controls className="flex-1 h-8" src={msg.content}
+              <audio controls className="flex-1 h-8" src={msg.mediaUrl || msg.content}
                 style={{ filter: isUser ? 'invert(1) brightness(0)' : 'none' }} />
             </div>
           )}
 
           {msg.type === 'document' && (
-            <a href={msg.content} target="_blank" rel="noreferrer"
+            <a href={msg.mediaUrl || msg.content} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 p-3 rounded-xl bg-black/5 hover:bg-black/10 transition-all border border-black/5 mb-1">
               <FileText className="w-5 h-5 opacity-50" />
               <div className="min-w-0">

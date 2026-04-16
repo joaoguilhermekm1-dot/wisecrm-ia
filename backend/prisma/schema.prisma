@@ -103,6 +103,7 @@ model Message {
   content        String
   sender         String        // 'user', 'lead', 'ai'
   type           String?       // 'text', 'audio', 'image'
+  mediaUrl       String?       // URL for media attachments
   leadId         String
   conversationId String?
   createdAt      DateTime      @default(now())
