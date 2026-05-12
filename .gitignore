@@ -1,4 +1,5 @@
 *.env
+!backend/.env.example
 node_modules/
 dist/
 dist-ssr/
@@ -12,3 +13,19 @@ yarn-debug.log*
 yarn-error.log*
 *.sqlite
 *.sqlite-journal
+
+# Binários / Arquivos pesados
+gh
+gh.tar.gz
+gh_login.exp
+*.exp
+notes_export.txt
+
+# Pastas não-essenciais ao deploy
+conversations/
+squads/
+designer-master-skill/
+designer-master.skill.zip
+proposta-*/
+baileys_auth_info/
+uploads/
