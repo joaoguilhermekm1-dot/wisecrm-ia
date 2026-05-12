@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Zap, User, Mail, Globe, Building2, Play, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { Search, Loader2, Zap, User, Mail, Globe, Building2, Play, CheckCircle2, AlertCircle, Download, Compass } from 'lucide-react';
 import { prospectingApi, leadsApi } from '../services/api';
 
 const ACTOR_OPTIONS = [
-  { id: 'compass/crawler-google-places',     label: 'Google Maps — Empresas Locais',   icon: '📍', desc: 'Extrai dados de negócios: telefone, site, e-mail, avaliação' },
+  { id: 'compass/crawler-google-places', label: 'Prospecção Local B2B (Google Maps)', icon: <Compass className="w-5 h-5 text-[#FAD485]" />, desc: 'Extrai dados de negócios: telefone, site, e-mail, avaliação' },
 ];
 
 function LeadResultCard({ lead, index }) {
@@ -219,15 +219,16 @@ export default function Discovery() {
             {ACTOR_OPTIONS.map(actor => (
               <button
                 key={actor.id}
-                onClick={() => setSelectedActor(actor.id)}
-                className="text-left p-3.5 rounded-xl transition-all"
+                onClick={() => !actor.disabled && setSelectedActor(actor.id)}
+                disabled={actor.disabled}
+                className={`text-left p-3.5 rounded-xl transition-all ${actor.disabled ? 'opacity-50 cursor-not-allowed filter grayscale' : ''}`}
                 style={{
                   background: selectedActor === actor.id ? 'rgba(250,212,133,0.08)' : '#060604',
                   border: `1px solid ${selectedActor === actor.id ? 'rgba(250,212,133,0.30)' : 'rgba(250,212,133,0.07)'}`,
                 }}
               >
-                <div className="flex items-start gap-2.5">
-                  <span className="text-xl leading-none">{actor.icon}</span>
+                <div className="flex items-start gap-3">
+                  <span className="shrink-0 mt-0.5">{actor.icon}</span>
                   <div>
                     <p className="text-xs font-bold" style={{ color: selectedActor === actor.id ? '#FAD485' : '#E8E6DF' }}>
                       {actor.label}

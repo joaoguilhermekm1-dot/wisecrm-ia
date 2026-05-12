@@ -11,7 +11,7 @@ router.use(authMiddleware);
 
 router.get('/meta/accounts', marketingController.getAdAccounts);
 router.get('/ads/insights', marketingController.getAdInsights);
-router.post('/ads/sync', marketingController.syncMetaInsights);
+router.post('/ads/sync', marketingController.syncAdInsights);
 router.get('/integrations', marketingController.getIntegrations);
 router.get('/connect/meta', marketingController.connectMetaAds);
 router.get('/connect/google', marketingController.connectGoogleAds);

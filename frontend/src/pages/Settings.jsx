@@ -37,6 +37,8 @@ function Section({ icon: Icon, title, subtitle, children }) {
 // ── Integration Status Card ────────────────────────────────────────────────
 function IntegStatusCard({ name, icon: Icon, color, status, hint, actionLabel, onAction, loading }) {
   const isConnected = status === 'CONNECTED';
+  const isPending = ['CONNECTING', 'QR_READY'].includes(status);
+  
   return (
     <div className="flex items-center gap-4 p-4 rounded-xl"
       style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -47,9 +49,9 @@ function IntegStatusCard({ name, icon: Icon, color, status, hint, actionLabel, o
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-white">{name}</p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
-          <span className="text-[11px] font-bold" style={{ color: isConnected ? '#86EFAC' : '#FCA5A5' }}>
-            {isConnected ? 'Conectado' : 'Desconectado'}
+          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400' : isPending ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
+          <span className="text-[11px] font-bold" style={{ color: isConnected ? '#86EFAC' : isPending ? '#FAD485' : '#FCA5A5' }}>
+            {isConnected ? 'Conectado' : isPending ? 'Conectando...' : 'Desconectado'}
           </span>
         </div>
         {hint && <p className="text-[10px] mt-1" style={{ color: '#4A4840' }}>{hint}</p>}

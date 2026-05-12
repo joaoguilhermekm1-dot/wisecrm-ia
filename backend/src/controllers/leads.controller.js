@@ -14,7 +14,7 @@ exports.createLead = async (req, res) => {
       pipeline = await prisma.pipeline.create({
         data: {
           name: 'Funil Wise (Padrão)',
-          stages: ['NEW', 'DIAGNÓSTICO', 'PROPOSTA', 'FECHAMENTO', 'PERDIDO'],
+          stages: ['NOVO', 'PROSPECÇÃO', 'DIAGNÓSTICO', 'FECHAMENTO', 'FECHADO', 'FOLLOW-UP'],
           userId
         }
       });
@@ -27,6 +27,15 @@ exports.createLead = async (req, res) => {
         email: email || null,
         phone: phone || null,
         source: source || 'Manual',
+        adId: req.body.adId || null,
+        campaignId: req.body.campaignId || null,
+        utmSource: req.body.utmSource || null,
+        utmMedium: req.body.utmMedium || null,
+        utmCampaign: req.body.utmCampaign || null,
+        utmContent: req.body.utmContent || null,
+        utmTerm: req.body.utmTerm || null,
+        fbclid: req.body.fbclid || null,
+        gclid: req.body.gclid || null,
         status: 'NEW',
         notes: notes || null,
         pipelineId: pipeline.id,
@@ -83,18 +92,21 @@ exports.createLeadsBatch = async (req, res) => {
       pipeline = await prisma.pipeline.create({
         data: {
           name: 'Funil Wise (Padrão)',
-          stages: ['NEW', 'DIAGNÓSTICO', 'PROPOSTA', 'FECHAMENTO', 'PERDIDO'],
+          stages: ['NOVO', 'PROSPECÇÃO', 'DIAGNÓSTICO', 'FECHAMENTO', 'FECHADO', 'FOLLOW-UP'],
           userId
         }
       });
     }
+
+    const currentStages = Array.isArray(pipeline.stages) ? pipeline.stages : JSON.parse(pipeline.stages || '[]');
+    const initialStage = currentStages[0] || 'NOVO';
 
     const dataToInsert = leads.map(l => ({
       name: l.name || l.username || 'Desconhecido',
       email: l.email || null,
       phone: l.phone || null,
       source: l.source || 'Apify Discovery',
-      status: 'NEW', // Stage inicial padrão
+      status: initialStage, // Usar a primeira etapa real do funil do usuário
       pipelineId: pipeline.id,
       ownerId: userId,
       metadata: {
@@ -126,7 +138,7 @@ exports.getLeads = async (req, res) => {
       where: { ownerId: req.user.userId },
       include: {
         messages: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { timestamp: 'desc' },
           take: 5
         }
       },
@@ -223,7 +235,7 @@ exports.getMessages = async (req, res) => {
   try {
     const messages = await prisma.message.findMany({
       where: { leadId: req.params.id },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { timestamp: 'asc' }
     });
     res.json(messages);
   } catch (err) {
@@ -306,8 +318,8 @@ exports.getAISuggestion = async (req, res) => {
       where: { id: leadId },
       include: { 
         messages: { 
-          orderBy: { createdAt: 'asc' }, 
-          take: 10 
+          orderBy: { timestamp: 'asc' }, 
+          take: 50 
         },
         memory: true
       }
@@ -345,7 +357,7 @@ exports.getConversations = async (req, res) => {
     const leads = await prisma.lead.findMany({
       where: { ownerId: req.user.userId },
       include: {
-        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        messages: { orderBy: { timestamp: 'desc' }, take: 1 },
         conversations: { take: 1 }
       },
       orderBy: { updatedAt: 'desc' },
@@ -374,5 +386,30 @@ exports.getConversations = async (req, res) => {
   } catch (err) {
     console.error('[Leads] Erro no getConversations', err);
     res.status(500).json({ error: 'Erro ao buscar conversas.' });
+  }
+};
+exports.markAsRead = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: { conversations: { take: 1 } }
+    });
+    if (!lead || !lead.conversations[0]) return res.status(404).json({ error: 'Conversa não encontrada.' });
+
+    await prisma.conversation.update({
+      where: { id: lead.conversations[0].id },
+      data: { unreadCount: 0 }
+    });
+
+    // Emitir evento para limpar notificação no front em tempo real
+    try {
+      const io = require('../lib/socket').getIO();
+      io.to(`user:${req.user.userId}`).emit('conversation:read', { leadId: id });
+    } catch (e) {}
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao marcar como lida.' });
   }
 };

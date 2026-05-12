@@ -49,6 +49,7 @@ const whatsappRoutes = require('./routes/whatsapp.routes');
 const pipelinesRoutes = require('./routes/pipelines.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const manualMetricsRoutes = require('./routes/manual-metrics.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadsRoutes);
@@ -60,6 +61,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/pipelines', pipelinesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/marketing/manual-metrics', manualMetricsRoutes);
 
 // Serivir mídias estáticas
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

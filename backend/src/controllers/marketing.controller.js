@@ -6,10 +6,9 @@ const axios = require('axios');
 
 exports.connectMetaAds = (req, res) => {
   const userId = req.user.userId;
-  // Gerar um state token com JWT para segurança contra CSRF e para passar o userId
   const state = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
   const appId = process.env.META_APP_ID;
-  const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+  const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
   const redirectUri = `${backendUrl}/api/marketing/meta/callback`;
   
   const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=ads_management,ads_read`;
@@ -20,7 +19,7 @@ exports.connectGoogleAds = (req, res) => {
   const userId = req.user.userId;
   const state = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const backendUrl = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
+  const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
   const redirectUri = `${backendUrl}/api/marketing/google/callback`;
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=https://www.googleapis.com/auth/adwords&state=${state}&access_type=offline&prompt=consent`;
@@ -247,13 +246,20 @@ exports.googleCallback = async (req, res) => {
 
     const { access_token, refresh_token } = tokenRes.data;
 
+    const updateData = {
+      accessToken: access_token,
+      status: 'CONNECTED'
+    };
+
+    // Google só manda o refresh_token na PRIMEIRA autorização ou se forçado. 
+    // Não podemos sobrescrever o que já temos com undefined.
+    if (refresh_token) {
+      updateData.refreshToken = refresh_token;
+    }
+
     await prisma.integration.upsert({
       where: { type_userId: { type: 'GOOGLE', userId } },
-      update: { 
-        accessToken: access_token, 
-        refreshToken: refresh_token || undefined,
-        status: 'CONNECTED' 
-      },
+      update: updateData,
       create: { 
         type: 'GOOGLE', 
         userId, 

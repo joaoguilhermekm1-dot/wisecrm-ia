@@ -5,8 +5,8 @@ const authMiddleware = require('../middlewares/auth.middleware');
 
 router.use(authMiddleware);
 
+router.get('/', leadsController.getLeads);
 router.get('/conversations', leadsController.getConversations);
-router.get('/:id', leadsController.getLeads);
 router.get('/:id/full', leadsController.getLeadFull);
 router.post('/', leadsController.createLead);
 router.post('/batch', leadsController.createLeadsBatch);
@@ -16,6 +16,7 @@ router.delete('/:id', leadsController.deleteLead);
 // Messages sub-routes
 router.get('/:id/messages', leadsController.getMessages);
 router.post('/:id/messages', leadsController.sendMessage);
+router.post('/:id/read', leadsController.markAsRead);
 router.get('/:id/ai-suggestion', leadsController.getAISuggestion);
 router.get('/:id/smart-templates', leadsController.getSmartTemplates);
 

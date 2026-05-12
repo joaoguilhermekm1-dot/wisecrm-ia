@@ -28,12 +28,44 @@ exports.getGlobalMetrics = async (req, res) => {
     const respondedLeads = allLeads.filter(l => l.messages.some(m => m.sender === 'lead')).length;
     const taxaResposta = totalLeads ? Math.round((respondedLeads / totalLeads) * 100) : 0;
 
+    // Métricas de Marketing (Gasto e Cliques)
+    const [adMetrics, manualMetrics] = await Promise.all([
+      prisma.adMetric.aggregate({
+        where: { userId: ownerId },
+        _sum: { spend: true, clicks: true }
+      }),
+      prisma.manualAdMetric.aggregate({
+        where: { userId: ownerId },
+        _sum: { spend: true, clicks: true }
+      })
+    ]);
+
+    const totalSpend = (adMetrics._sum.spend || 0) + (manualMetrics._sum.spend || 0);
+    const totalClicks = (adMetrics._sum.clicks || 0) + (manualMetrics._sum.clicks || 0);
+
     const kpiData = {
-      totalLeads, fechados, perdidos, leadsQuentes, avgTemp, taxaResposta
+      totalLeads, 
+      fechados, 
+      perdidos, 
+      leadsQuentes, 
+      avgTemp, 
+      taxaResposta,
+      totalSpend: Math.round(totalSpend * 100) / 100,
+      totalClicks
     };
 
     // Gera Insight de IA
-    const aiInsight = await intelligenceService.agentAnalytics(kpiData);
+    let aiInsight = null;
+    try {
+      aiInsight = await intelligenceService.agentAnalytics(kpiData);
+    } catch (aiErr) {
+      console.warn('[Analytics IA] Falha ao gerar insight:', aiErr.message);
+      aiInsight = { 
+        diagnostico_erro: "Análise IA indisponível no momento.",
+        solucao_rapida: "Verifique suas métricas manualmente.",
+        plano_acao: "Tente novamente em alguns instantes."
+      };
+    }
 
     res.json({
       metrics: kpiData,

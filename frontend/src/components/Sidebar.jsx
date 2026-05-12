@@ -73,7 +73,12 @@ export default memo(function Sidebar() {
                 className={clsx('w-[17px] h-[17px] shrink-0 transition-colors', !isActive && 'group-hover:text-[#E8E6DF]')}
               />
               <span className="truncate">{item.label}</span>
-              {isActive && (
+              {item.path === '/conversations' && (
+                <span className="ml-auto flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[#FAD485] text-[9px] font-black text-black shadow-[0_0_10px_rgba(250,212,133,0.4)] animate-pulse-gold">
+                  3
+                </span>
+              )}
+              {isActive && item.path !== '/conversations' && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
                   style={{ background: '#FAD485', boxShadow: '0 0 6px rgba(250,212,133,0.7)' }} />
               )}

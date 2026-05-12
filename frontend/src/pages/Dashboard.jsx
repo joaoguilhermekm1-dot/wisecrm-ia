@@ -2,24 +2,32 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Target, TrendingUp, Award, ArrowRight, Sparkles,
   ChevronUp, ChevronDown, Flame, MessageSquare, Clock,
-  Zap, BarChart3, Activity, AlertTriangle
+  Zap, BarChart3, Activity, AlertTriangle, DollarSign, MousePointer2
 } from 'lucide-react';
 import { leadsApi, analyticsApi } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
+const normalizeStageKey = (s) => (s || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
+
 const STATUS_LABEL = {
-  NEW: 'Novo',
-  'DIAGNÓSTICO': 'Diagnóstico',
-  PROPOSTA: 'Proposta',
+  NOVO: 'Novo',
+  PROSPECCAO: 'Prospec\u00e7\u00e3o',
+  DIAGNOSTICO: 'Diagn\u00f3stico',
+  DIAGNDIAGNOSTICO: 'Diagn\u00f3stico',
+  FECHAMENTO: 'Fechamento',
   FECHADO: 'Fechado',
+  FOLLOWUP: 'Follow-up',
   PERDIDO: 'Perdido',
 };
 
 const STATUS_BADGE = {
-  NEW:          { bg: 'rgba(250,212,133,0.10)', color: '#FAD485',   border: 'rgba(250,212,133,0.20)' },
-  'DIAGNÓSTICO':{ bg: 'rgba(99,102,241,0.10)',  color: '#A5B4FC',   border: 'rgba(99,102,241,0.20)' },
-  PROPOSTA:     { bg: 'rgba(139,92,246,0.10)',  color: '#C4B5FD',   border: 'rgba(139,92,246,0.20)' },
+  NOVO:         { bg: 'rgba(250,212,133,0.10)', color: '#FAD485',   border: 'rgba(250,212,133,0.20)' },
+  PROSPECCAO:   { bg: 'rgba(59,130,246,0.10)',  color: '#60A5FA',   border: 'rgba(59,130,246,0.20)' },
+  DIAGNOSTICO:  { bg: 'rgba(99,102,241,0.10)',  color: '#A5B4FC',   border: 'rgba(99,102,241,0.20)' },
+  DIAGNDIAGNOSTICO: { bg: 'rgba(99,102,241,0.10)',  color: '#A5B4FC',   border: 'rgba(99,102,241,0.20)' },
+  FECHAMENTO:   { bg: 'rgba(139,92,246,0.10)',  color: '#C4B5FD',   border: 'rgba(139,92,246,0.20)' },
   FECHADO:      { bg: 'rgba(34,197,94,0.10)',   color: '#86EFAC',   border: 'rgba(34,197,94,0.20)' },
+  FOLLOWUP:     { bg: 'rgba(249,115,22,0.10)',  color: '#FB923C',   border: 'rgba(249,115,22,0.20)' },
   PERDIDO:      { bg: 'rgba(239,68,68,0.10)',   color: '#FCA5A5',   border: 'rgba(239,68,68,0.20)' },
 };
 
@@ -87,7 +95,8 @@ function FunnelBar({ label, count, total, color }) {
 function ActivityItem({ lead, onClick }) {
   const temp = lead.temperature || 0;
   const tempColor = temp >= 70 ? '#EF4444' : temp >= 40 ? '#F59E0B' : '#3B82F6';
-  const status = STATUS_BADGE[lead.status] || STATUS_BADGE.NEW;
+  const normKey = normalizeStageKey(lead.status);
+  const status = STATUS_BADGE[normKey] || STATUS_BADGE.NOVO || { bg: 'rgba(255,255,255,0.05)', color: '#fff', border: 'rgba(255,255,255,0.1)' };
 
   return (
     <div
@@ -109,8 +118,8 @@ function ActivityItem({ lead, onClick }) {
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-          style={{ background: status.bg, color: status.color, border: `1px solid ${status.border}` }}>
-          {STATUS_LABEL[lead.status] || lead.status}
+          style={{ background: status?.bg || 'transparent', color: status?.color || '#fff', border: `1px solid ${status?.border || 'transparent'}` }}>
+          {STATUS_LABEL[normKey] || lead.status}
         </span>
         {temp > 0 && (
           <div className="flex items-center gap-1" style={{ color: tempColor }}>
@@ -144,35 +153,35 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const total      = leads.length;
-  const fechados   = leads.filter(l => l.status === 'FECHADO' || l.status === 'FECHAMENTO').length;
-  const perdidos   = leads.filter(l => l.status === 'PERDIDO' || l.status === 'LOST').length;
-  const ativos     = total - fechados - perdidos;
-  const conversao  = total ? ((fechados / total) * 100).toFixed(1) : '0';
+  const total = leads.length;
+  const fechados = leads.filter(l => ['FECHADO', 'FECHAMENTO', 'WON', 'GANHO', 'ATIVO'].includes((l.status || '').toUpperCase())).length;
+  const perdidos = leads.filter(l => ['PERDIDO', 'LOST', 'CANCELADO'].includes((l.status || '').toUpperCase())).length;
+  const ativos = total - fechados - perdidos;
+  const conversao = total ? ((fechados / total) * 100).toFixed(1) : '0';
 
   const recentLeads = [...leads]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 6);
 
   const hotLeads = leads
-    .filter(l => l.temperature >= 60 && !['FECHADO', 'PERDIDO', 'LOST'].includes(l.status))
+    .filter(l => l.temperature >= 60 && !['FECHADO', 'PERDIDO', 'LOST', 'GANHO', 'WON'].includes((l.status || '').toUpperCase()))
     .sort((a, b) => b.temperature - a.temperature)
     .slice(0, 4);
 
   // Funil visual
   const funnelData = [
-    { label: 'Novos', count: leads.filter(l => ['NEW','NOVO','PENDENTE'].includes((l.status||'').toUpperCase())).length, color: '#FAD485' },
-    { label: 'Diagnóst.', count: leads.filter(l => ['DIAGNÓSTICO','DIAGNOSTICO','QUALIFICADO'].includes((l.status||'').toUpperCase())).length, color: '#A5B4FC' },
-    { label: 'Proposta', count: leads.filter(l => ['PROPOSTA','NEGOCIAÇÃO'].includes((l.status||'').toUpperCase())).length, color: '#C4B5FD' },
-    { label: 'Fechados', count: fechados, color: '#86EFAC' },
-    { label: 'Perdidos', count: perdidos, color: '#FCA5A5' },
+    { label: 'Novos', count: leads.filter(l => ['NEW', 'NOVO', 'PENDENTE'].includes((l.status || '').toUpperCase())).length, color: '#FAD485' },
+    { label: 'Prospecção', count: leads.filter(l => ['PROSPECÇÃO', 'PROSPECCAO'].includes((l.status || '').toUpperCase())).length, color: '#60A5FA' },
+    { label: 'Diagnóst.', count: leads.filter(l => ['DIAGNÓSTICO', 'DIAGNOSTICO', 'QUALIFICADO'].includes((l.status || '').toUpperCase())).length, color: '#A5B4FC' },
+    { label: 'Fechamento', count: leads.filter(l => ['FECHAMENTO', 'PROPOSTA', 'NEGOCIAÇÃO'].includes((l.status || '').toUpperCase())).length, color: '#C4B5FD' },
+    { label: 'Fechados', count: leads.filter(l => ['FECHADO', 'GANHO', 'WON', 'ATIVO'].includes((l.status || '').toUpperCase())).length, color: '#86EFAC' },
   ];
 
   const stats = [
-    { label: 'Total de Leads',    value: total.toString(),    icon: Users,      color: '#FAD485', sub: 'No funil ativo' },
-    { label: 'Taxa de Conversão', value: `${conversao}%`,     icon: Target,     color: '#86EFAC', sub: `${fechados} fechados` },
-    { label: 'Leads Ativos',      value: ativos.toString(),    icon: Activity,   color: '#A5B4FC', sub: 'Em negociação' },
-    { label: 'Temperatura Média', value: `${analytics?.metrics?.avgTemp || 0}°`, icon: Flame, color: '#EF4444', sub: 'Potencial do funil' },
+    { label: 'Total de Leads', value: total.toString(), icon: Users, color: '#FAD485', sub: 'No funil ativo' },
+    { label: 'Taxa de Conversão', value: `${conversao}%`, icon: Zap, color: '#86EFAC', sub: `${fechados} fechados` },
+    { label: 'Investimento Ads', value: `R$ ${analytics?.metrics?.totalSpend || 0}`, icon: DollarSign, color: '#A78BFA', sub: 'Meta + Google' },
+    { label: 'Cliques Totais', value: (analytics?.metrics?.totalClicks || 0).toString(), icon: MousePointer2, color: '#3B82F6', sub: 'Volume de tráfego' },
   ];
 
   return (
@@ -243,8 +252,8 @@ export default function Dashboard() {
             <div className="grid md:grid-cols-3 gap-4 max-w-4xl">
               {[
                 { key: 'diagnostico_erro', label: 'Diagnóstico Crítico', color: '#FCA5A5', dot: '#EF4444' },
-                { key: 'solucao_rapida',   label: 'Solução Rápida',      color: '#86EFAC', dot: '#22C55E' },
-                { key: 'plano_acao',       label: 'Plano de Ação',       color: '#FAD485', dot: '#FAD485' },
+                { key: 'solucao_rapida', label: 'Solução Rápida', color: '#86EFAC', dot: '#22C55E' },
+                { key: 'plano_acao', label: 'Plano de Ação', color: '#FAD485', dot: '#FAD485' },
               ].map(({ key, label, color, dot }) => (
                 <div key={key} className="flex items-start gap-3 p-4 rounded-xl"
                   style={{ background: `${dot}04`, border: `1px solid ${dot}12` }}>
@@ -278,7 +287,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-3">
             {loading ? (
-              [1,2,3,4,5].map(i => <div key={i} className="h-6 rounded-lg bg-white/5 animate-pulse" />)
+              [1, 2, 3, 4, 5].map(i => <div key={i} className="h-6 rounded-lg bg-white/5 animate-pulse" />)
             ) : (
               funnelData.map(f => (
                 <FunnelBar key={f.label} total={total} {...f} />
@@ -304,7 +313,7 @@ export default function Dashboard() {
 
           <div className="space-y-2">
             {loading ? (
-              [1,2,3].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)
+              [1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)
             ) : hotLeads.length === 0 ? (
               <div className="py-8 text-center">
                 <Flame className="w-8 h-8 mx-auto mb-3 opacity-20" style={{ color: '#EF4444' }} />
@@ -344,7 +353,7 @@ export default function Dashboard() {
 
           <div className="space-y-2">
             {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)
+              [1, 2, 3, 4].map(i => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)
             ) : recentLeads.length === 0 ? (
               <div className="py-8 text-center">
                 <Users className="w-8 h-8 mx-auto mb-3 opacity-20" />
@@ -367,10 +376,10 @@ export default function Dashboard() {
       {/* Quick actions strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Prospectar Leads',    icon: Zap,          route: '/discovery',    color: '#FAD485' },
-          { label: 'Ver Pipeline',         icon: BarChart3,    route: '/leads',        color: '#A5B4FC' },
-          { label: 'Caixa de Entrada',     icon: MessageSquare,route: '/conversations',color: '#86EFAC' },
-          { label: 'Marketing Hub',        icon: TrendingUp,   route: '/marketing',    color: '#C4B5FD' },
+          { label: 'Prospectar Leads', icon: Zap, route: '/discovery', color: '#FAD485' },
+          { label: 'Ver Pipeline', icon: BarChart3, route: '/leads', color: '#A5B4FC' },
+          { label: 'Caixa de Entrada', icon: MessageSquare, route: '/conversations', color: '#86EFAC' },
+          { label: 'Marketing Hub', icon: TrendingUp, route: '/marketing', color: '#C4B5FD' },
         ].map(({ label, icon: Icon, route, color }) => (
           <button key={route} onClick={() => navigate(route)}
             className="flex items-center gap-3 p-4 rounded-2xl transition-all text-left group"

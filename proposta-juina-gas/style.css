@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;700;900&display=swap');
+
+:root {
+    --black: #000000;
+    --gold: #deb95a;
+    --gold-light: #f1d58a;
+    --gray-dark: #0a0a0a;
+    --gray-light: #121212;
+    --text: #ffffff;
+    --text-muted: #888888;
+    --danger: #ff4d4d;
+    --transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    --border: rgba(222, 185, 90, 0.15);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    background-color: var(--black);
+    color: var(--text);
+    overflow-x: hidden;
+    line-height: 1.6;
+}
+
+section {
+    min-height: 100vh;
+    padding: 80px 10%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Typography */
+h1 { font-size: clamp(2.5rem, 8vw, 5rem); font-weight: 900; line-height: 1.1; margin-bottom: 2rem; }
+h2 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 700; margin-bottom: 3rem; text-transform: uppercase; letter-spacing: 2px; }
+
+.section-tag {
+    color: var(--gold);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    display: block;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Value Bars (R$ 5k Section) */
+.value-bar {
+    background: var(--gray-light);
+    border-left: 4px solid var(--gold);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    border-radius: 0 20px 20px 0;
+    transition: var(--transition);
+}
+
+.value-bar:hover {
+    background: #1a1a1a;
+    transform: translateX(10px);
+}
+
+.value-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 1rem;
+}
+
+.value-header h3 {
+    font-size: 1.6rem;
+    color: var(--gold);
+    text-transform: uppercase;
+}
+
+.value-unit {
+    font-size: 1.4rem;
+    font-weight: 900;
+}
+
+.sub-deliverables {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    opacity: 0.8;
+}
+
+.sub-deliverables li {
+    font-size: 0.9rem;
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.sub-deliverables li::before {
+    content: '•';
+    color: var(--gold);
+    position: absolute;
+    left: 0;
+    font-weight: bold;
+}
+
+/* Final Proposals */
+.proposal-card {
+    background: linear-gradient(135deg, #0a0a0a 0%, #111 100%);
+    border: 1px solid var(--border);
+    padding: 4rem;
+    border-radius: 40px;
+    text-align: center;
+}
+
+.proposal-list {
+    list-style: none;
+    margin: 3rem 0;
+    text-align: left;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.proposal-list li {
+    padding: 1.2rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+}
+
+.proposal-list li::before {
+    content: '✓';
+    color: var(--gold);
+    margin-right: 1.5rem;
+    font-weight: 900;
+}
+
+.btn-cta {
+    background: var(--gold);
+    color: var(--black);
+    padding: 1.5rem 4rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 100px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: var(--transition);
+}
+
+.btn-cta:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(222, 185, 90, 0.4); }
+
+.reveal { opacity: 0; transform: translateY(30px); transition: var(--transition); }
+.reveal.active { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 768px) {
+    section { padding: 80px 5%; }
+    .value-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+}

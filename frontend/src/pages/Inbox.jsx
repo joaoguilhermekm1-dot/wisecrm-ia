@@ -6,11 +6,13 @@ import {
   BrainCircuit, Zap, ChevronRight, Mic,
   Paperclip, FileText, Square, Trash2,
   CheckCircle2, X, Image as ImageIcon, Wifi, WifiOff,
-  RefreshCcw, MessageSquarePlus, Users
+  RefreshCcw, MessageSquarePlus, Users, Video, AlertTriangle,
+  Target, Lightbulb, MessageCircle
 } from 'lucide-react';
 import { leadsApi, messagesApi, uploadApi } from '../services/api';
 import { socket, connectSocket, disconnectSocket, viewChat, leaveChat } from '../services/socket';
 import api from '../services/api';
+import LiquidGlass from 'liquid-glass-react';
 
 // ── Conversation Item ──────────────────────────────────────────────────────
 function ConversationItem({ conv, active, onClick }) {
@@ -420,11 +422,18 @@ export default function Inbox() {
       }
     });
 
+    socket.on('conversation:read', (payload) => {
+      setConversations(prev => prev.map(c => 
+        c.leadId === payload.leadId ? { ...c, unreadCount: 0 } : c
+      ));
+    });
+
     socket.on('whatsapp_status', (data) => setStatus(data.status));
 
     return () => {
       socket.off('message:new');
       socket.off('ai:decision');
+      socket.off('conversation:read');
       socket.off('whatsapp_status');
     };
   }, [activeConv?.id]);
@@ -515,6 +524,7 @@ export default function Inbox() {
     fetchHistory();
     fetchSmartTemplates(activeConv.leadId);
     setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, unreadCount: 0 } : c));
+    leadsApi.markAsRead(activeConv.leadId).catch(() => {});
   }, [activeConv?.id, showInfoPanel]);
 
   const handleUpdateStatus = async (newStatus) => {
@@ -623,21 +633,34 @@ export default function Inbox() {
     const isUser = msg.sender === 'user';
     return (
       <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-        <div className="max-w-[70%] px-4 py-2.5 rounded-2xl relative"
+        <div className="max-w-[72%] px-4 py-2.5 rounded-2xl relative shadow-sm"
           style={isUser
-            ? { background: 'linear-gradient(135deg,#FAD485,#F5C842)', color: '#000', borderBottomRightRadius: '4px' }
-            : { background: '#0A0A07', color: '#E8E6DF', border: '1px solid rgba(250,212,133,0.08)', borderBottomLeftRadius: '4px' }
+            ? { background: '#005c4b', color: '#e9edef', borderBottomRightRadius: '0px' }
+            : { background: '#202c33', color: '#e9edef', borderBottomLeftRadius: '0px' }
           }>
 
           {msg.type === 'image' && (
-            <div className="mb-2 rounded-lg overflow-hidden border border-white/10">
-              <img src={msg.mediaUrl || msg.content} alt="Imagem" className="max-w-full h-auto cursor-pointer rounded-lg max-h-64 object-cover"
-                onClick={() => window.open(msg.mediaUrl || msg.content)} />
+            <div className="mb-2 rounded-xl overflow-hidden border border-white/10 cursor-pointer"
+              onClick={() => window.open(msg.mediaUrl || msg.content)}>
+              <img src={msg.mediaUrl || msg.content} alt="Imagem" className="max-w-full h-auto rounded-xl max-h-72 object-cover hover:scale-105 transition-transform duration-300" />
+            </div>
+          )}
+
+          {msg.type === 'video' && (
+            <div className="mb-2 rounded-xl overflow-hidden border border-white/10">
+              <video
+                controls
+                className="max-w-full rounded-xl max-h-64"
+                src={msg.mediaUrl || msg.content}
+                style={{ background: '#000' }}
+              >
+                Seu navegador não suporta vídeos.
+              </video>
             </div>
           )}
 
           {msg.type === 'audio' && (
-            <div className="flex items-center gap-3 py-1 min-w-[200px]">
+            <div className="flex items-center gap-3 py-1 min-w-[220px]">
               <Mic className="w-4 h-4 shrink-0 opacity-60" />
               <audio controls className="flex-1 h-8" src={msg.mediaUrl || msg.content}
                 style={{ filter: isUser ? 'invert(1) brightness(0)' : 'none' }} />
@@ -656,7 +679,7 @@ export default function Inbox() {
           )}
 
           {(!msg.type || msg.type === 'text') && (
-            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
           )}
 
           <p className="text-[9px] mt-1 text-right opacity-40 uppercase">
@@ -769,9 +792,11 @@ export default function Inbox() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col" style={{ background: '#000000' }}>
+      <div className="flex-1 flex flex-col relative" style={{ background: '#0b141a' }}>
+        {/* WhatsApp background pattern */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
         {activeConv ? (
-          <>
+          <div className="flex-1 flex flex-col relative z-10 overflow-hidden">
             {/* Chat Header */}
             <div className="px-5 py-4 flex items-center justify-between shrink-0"
               style={{ borderBottom: '1px solid rgba(250,212,133,0.06)', background: 'rgba(6,6,4,0.9)' }}>
@@ -817,62 +842,102 @@ export default function Inbox() {
                   </div>
                 </div>
               )}
-                      {/* AI Decision Panel - Premium Edition */}
-              {aiDecision && !pendingImage && (
-                <div className="mx-5 mb-3 p-5 rounded-3xl border border-[#FAD485]/20 animate-slide-up relative overflow-hidden group shadow-2xl"
-                  style={{ background: 'rgba(10,10,7,0.95)', backdropFilter: 'blur(20px)' }}>
-                  
-                  {/* Decorative background glow */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#FAD485]/5 blur-[60px] rounded-full -mr-16 -mt-16 pointer-events-none" />
-                  
-                  <div className="relative z-10 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#FAD485]/10 flex items-center justify-center shadow-inner">
-                          <Sparkles className="w-4 h-4 text-[#FAD485] animate-pulse" />
+                      {aiDecision && !pendingImage && (
+                <div className="px-5 mb-3 space-y-2 animate-slide-up">
+                  {/* Sugestão principal da Alanis */}
+                  <LiquidGlass
+                    displacementScale={30}
+                    blurAmount={0.3}
+                    saturation={120}
+                    elasticity={0.2}
+                    cornerRadius={16}
+                    className="border border-[#FAD485]/20"
+                  >
+                  <div className="p-4 relative overflow-hidden"
+                    style={{ background: 'rgba(10,10,7,0.8)' }}>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#FAD485]/5 blur-[40px] rounded-full pointer-events-none" />
+                    
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-[#FAD485]/10 flex items-center justify-center">
+                            <Sparkles className="w-3 h-3 text-[#FAD485]" />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FAD485]/80">Alanis sugere</span>
                         </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FAD485]/80 block">Alanis SDR</span>
-                          <span className="text-[9px] text-[#6B6860] uppercase font-bold">Sugestão Humanizada</span>
+                        <div className="flex items-center gap-2">
+                          {aiDecision.analysis?.disc && (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(250,212,133,0.1)', color: '#FAD485' }}>
+                              DISC: {aiDecision.analysis.disc}
+                            </span>
+                          )}
+                          <button onClick={() => setAiDecision(null)} className="p-1 rounded-lg hover:bg-white/5 text-[#6B6860] transition-all">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                          <div className="w-1 h-1 rounded-full bg-green-400" />
-                          <span className="text-[9px] font-black text-green-400 uppercase tracking-wider">{aiDecision.strategy?.proxima_acao || 'Ação'}</span>
-                        </div>
-                        <button onClick={() => setAiDecision(null)} className="p-1 rounded-lg hover:bg-white/5 text-[#6B6860] transition-all hover:rotate-90">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
 
-                    <div className="relative">
-                      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#FAD485] to-transparent opacity-30 rounded-full" />
-                      <p className="text-[13px] text-white/90 leading-relaxed font-medium italic pl-4">
-                        "{aiDecision.suggestedResponse}"
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                      <div className="flex items-center gap-2">
-                        <BrainCircuit className="w-3.5 h-3.5 text-[#6B6860]" />
-                        <p className="text-[10px] text-[#6B6860] font-medium italic max-w-[200px] truncate">
-                          {aiDecision.strategy?.objetivo || 'Aumentar conexão'}
+                      <div className="relative mb-3">
+                        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#FAD485] to-transparent opacity-40 rounded-full" />
+                        <p className="text-[13px] text-white/90 leading-relaxed font-medium pl-4">
+                          {aiDecision.suggestedResponse}
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setMsgInput(aiDecision.suggestedResponse)}
-                          className="px-4 py-2 rounded-xl bg-white/5 text-white/80 text-[10px] font-black hover:bg-white/10 transition-all uppercase tracking-wider">
-                          Personalizar
-                        </button>
-                        <button onClick={() => handleSendMessage(aiDecision.suggestedResponse)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FAD485] to-[#F5C842] text-black hover:scale-105 active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider shadow-[0_4px_15px_rgba(250,212,133,0.3)]">
-                          Enviar Agora <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+
+                      {aiDecision.rationale && (
+                        <p className="text-[10px] text-[#6B6860] italic mb-3 flex items-center gap-1.5">
+                          <Target className="w-3 h-3 text-[#FAD485]/50 shrink-0" />
+                          {aiDecision.rationale}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                        <div className="flex items-center gap-2">
+                          {aiDecision.nextAction && (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(134,239,172,0.08)', color: '#86EFAC', border: '1px solid rgba(134,239,172,0.15)' }}>
+                              → {aiDecision.nextAction}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setMsgInput(aiDecision.suggestedResponse)}
+                            className="px-3 py-1.5 rounded-xl bg-white/5 text-white/70 text-[10px] font-black hover:bg-white/10 transition-all uppercase tracking-wider">
+                            Editar
+                          </button>
+                          <button onClick={() => handleSendMessage(aiDecision.suggestedResponse)}
+                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#FAD485] to-[#F5C842] text-black hover:scale-105 active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider shadow-[0_4px_12px_rgba(250,212,133,0.25)]">
+                            Enviar <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
+                  </LiquidGlass>
+
+                  {/* Análise em tempo real + sugestões alternativas */}
+                  {aiDecision.realtimeAnalysis && (
+                    <div className="p-3 rounded-xl border border-white/5" style={{ background: 'rgba(6,6,4,0.8)' }}>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Lightbulb className="w-3 h-3 text-[#FAD485]/60" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-[#6B6860]">Outras abordagens</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(aiDecision.realtimeAnalysis.sugestoes || []).map((s, i) => (
+                          <button key={i}
+                            onClick={() => setMsgInput(s.mensagem)}
+                            className="w-full text-left p-2.5 rounded-xl text-[11px] transition-all group"
+                            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(250,212,133,0.15)'}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)'}>
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: 'rgba(250,212,133,0.08)', color: '#FAD485' }}>{s.tipo}</span>
+                            </div>
+                            <p className="text-[#9B9589] group-hover:text-white transition-colors leading-relaxed">{s.mensagem}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -905,6 +970,23 @@ export default function Inbox() {
                       title="Templates inteligentes"
                     >
                       <Sparkles className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setProcessingAI(true);
+                        try {
+                          const res = await messagesApi.getAISuggestion(activeConv.leadId);
+                          if(res.data) setAiDecision(res.data);
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setProcessingAI(false);
+                        }
+                      }}
+                      className="p-2 rounded-lg transition-all text-[#6B6860] hover:text-[#FAD485]"
+                      title="Gerar sugestão com IA"
+                    >
+                      <BrainCircuit className="w-4 h-4" />
                     </button>
                   </div>
 
@@ -952,7 +1034,7 @@ export default function Inbox() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
             <MessageSquare className="w-12 h-12 mx-auto mb-4" />
@@ -1024,7 +1106,14 @@ export default function Inbox() {
                   <BrainCircuit className="w-3.5 h-3.5 text-[#FAD485]" />
                   <h4 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Perfil Comportamental</h4>
                 </div>
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-[#FAD485]/5 to-transparent border border-[#FAD485]/10">
+                <LiquidGlass
+                  displacementScale={20}
+                  blurAmount={0.2}
+                  saturation={100}
+                  elasticity={0.2}
+                  cornerRadius={16}
+                >
+                <div className="p-4 bg-gradient-to-br from-[#FAD485]/5 to-transparent border border-[#FAD485]/10">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-[#FAD485] text-black uppercase">
                       DISC: {fullLeadData.memory.disc || 'Identificando...'}
@@ -1035,6 +1124,7 @@ export default function Inbox() {
                     {fullLeadData.memory.summary || "Alanis ainda está perfilando o comportamento deste lead..."}
                   </p>
                 </div>
+                </LiquidGlass>
               </div>
             )}
 

@@ -6,7 +6,7 @@ const API_URL = `${BACKEND_URL}/api`;
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
-  headers: { 
+  headers: {
     'Content-Type': 'application/json',
     'Bypass-Tunnel-Reminder': 'true',
     'ngrok-skip-browser-warning': 'true'
@@ -28,7 +28,7 @@ api.interceptors.response.use(
   (error) => {
     // Não deslogar se for uma tentativa de login intencional
     const isLoginEndpoint = error.config?.url?.includes('/auth/login');
-    
+
     if (error.response?.status === 401 && !isLoginEndpoint) {
       localStorage.removeItem('wise_token');
       localStorage.removeItem('wise_user');
@@ -55,12 +55,16 @@ export const leadsApi = {
   batchCreate: (leads) => api.post('/leads/batch', { leads }),
   update: (id, data) => api.patch(`/leads/${id}`, data),
   getFull: (id) => api.get(`/leads/${id}/full`),
+  markAsRead: (id) => api.post(`/leads/${id}/read`),
   delete: (id) => api.delete(`/leads/${id}`),
 };
 
 export const pipelinesApi = {
   get: () => api.get('/pipelines'),
-  updateStages: (stages) => api.patch('/pipelines/stages', { stages }),
+  addStage: (name) => api.post('/pipelines/stages', { name }),
+  renameStage: (oldName, newName) => api.put('/pipelines/stages/rename', { oldName, newName }),
+  reorderStages: (stages) => api.put('/pipelines/stages/reorder', { stages }),
+  deleteStage: (name) => api.delete(`/pipelines/stages/${name}`),
   reset: () => api.post('/pipelines/reset'),
 };
 
@@ -88,6 +92,13 @@ export const marketingApi = {
   getMetaConnectUrl: () => api.get('/marketing/connect/meta'),
   getGoogleConnectUrl: () => api.get('/marketing/connect/google'),
   getIntegrations: () => api.get('/marketing/integrations'),
+};
+
+export const manualMetricsApi = {
+  getMetrics: (platform, startDate, endDate) => api.get('/marketing/manual-metrics', { params: { platform, startDate, endDate } }),
+  createMetric: (data) => api.post('/marketing/manual-metrics', data),
+  updateMetric: (id, data) => api.put(`/marketing/manual-metrics/${id}`, data),
+  deleteMetric: (id) => api.delete(`/marketing/manual-metrics/${id}`),
 };
 
 // --- Processes ---

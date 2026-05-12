@@ -8,21 +8,39 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  metaPixelId     String?
+  metaCapiToken   String?
+  whatsappSession String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users          User[]
+  leads          Lead[]
+  pipelineStages PipelineStage[]
+}
+
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
+  id           String   @id @default(uuid())
+  companyId    String? // Adicionado para multitenancy
+  email        String   @unique
   name         String?
   passwordHash String
-  role         Role          @default(USER)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  integrations Integration[]
-  leads        Lead[]
-  pipelines    Pipeline[]
-  processes    Process[]
-  adMetrics    AdMetric[]
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company           Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integrations      Integration[]
+  leads             Lead[]
+  pipelines         Pipeline[]
+  processes         Process[]
+  adMetrics         AdMetric[]
   adCampaignMetrics AdCampaignMetric[]
   adCreativeMetrics AdCreativeMetric[]
+  manualAdMetrics   ManualAdMetric[]
 }
 
 model Integration {
@@ -41,74 +59,125 @@ model Integration {
 }
 
 model Lead {
-  id                String         @id @default(uuid())
+  id                String   @id @default(uuid())
+  companyId         String? // Adicionado para multitenancy
   name              String
   email             String?
   phone             String?
-  whatsappJid       String?        @unique
+  whatsappJid       String?  @unique
   source            String?
-  status            String         @default("NEW")
-  temperature       Int            @default(0) // 0-100: frio, morno, quente
-  probability       Int            @default(0) // 0-100: probabilidade de compra
-  consciousness     String?        // baixo, médio, alto
-  summary           String?        // Resumo da IA em 1 frase
-  notes             String?        // Notas internas manuais
-  tags              String[]       @default([])
-  lastInteractionAt DateTime       @default(now())
-  pipelineId        String
-  ownerId           String
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  status            String   @default("NEW")
+  temperature       Int      @default(0)
+  winProbability    Float    @default(0.0)
+  consciousness     String?
+  discProfile       Json? // Modificado para o ECC
+  diagnosis         Json? // BLOD: { pain, scenario, implication }
+  summary           String?
+  notes             String?
+  tags              String[] @default([])
+  lastInteractionAt DateTime @default(now())
+  pipelineId        String?
+  ownerId           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
   metadata          Json?
-  owner             User           @relation(fields: [ownerId], references: [id])
-  pipeline          Pipeline       @relation(fields: [pipelineId], references: [id])
-  messages          Message[]
-  conversations     Conversation[]
-  memory            LeadMemory?
+  adId              String?
+  campaignId        String?
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  utmContent        String?
+  utmTerm           String?
+  fbclid            String?
+  gclid             String?
+
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner         User?          @relation(fields: [ownerId], references: [id])
+  pipeline      Pipeline?      @relation(fields: [pipelineId], references: [id])
+  messages      Message[]
+  conversations Conversation[]
+  memory        LeadMemory?
+  opportunities Opportunity[]
+
+  @@unique([companyId, phone]) // Regra ECC
+}
+
+model PipelineStage {
+  id         String  @id @default(uuid())
+  companyId  String
+  name       String
+  order      Int
+  isWonStage Boolean @default(false)
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+}
+
+model Opportunity {
+  id              String    @id @default(uuid())
+  leadId          String
+  pipelineStageId String
+  value           Float?
+  status          OppStatus @default(OPEN)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lead  Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  stage PipelineStage @relation(fields: [pipelineStageId], references: [id])
+}
+
+enum OppStatus {
+  OPEN
+  WON
+  LOST
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  leadId         String
+  remoteJid      String?
+  content        String
+  mediaUrl       String?
+  sender         String // 'user', 'lead', 'ai' (Atualizado para SenderType se necessário)
+  type           String?
+  isDeleted      Boolean  @default(false)
+  aiRationale    Json? // { intent, suggestedReply, reasoning }
+  timestamp      DateTime @default(now())
+  conversationId String?
+
+  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+}
+
+model Conversation {
+  id          String    @id @default(uuid())
+  jid         String    @unique
+  lastMessage String?
+  unreadCount Int       @default(0)
+  platform    String    @default("whatsapp")
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  messages    Message[]
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
 }
 
 model LeadMemory {
   id           String   @id @default(uuid())
   leadId       String   @unique
   lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  disc         String?        // D (Dominante), I (Influente), S (Estável), C (Cauteloso)
-  toneStyle    String?        // formal, casual, direto, empático, técnico
-  pace         String?        // rápido, moderado, lento
-  objections   String[]  @default([])   // objeções já levantadas
-  hooks        String[]  @default([])   // o que ressoou/funcionou com o lead
-  painPoints   String[]  @default([])   // dores identificadas
-  desires      String[]  @default([])   // desejos e objetivos do lead
-  summary      String?        // resumo acumulado do perfil comportamental
-  interactions Int       @default(0)    // total de iterações com a IA
-  lastAnalysis Json?          // última análise completa do agente
-  updatedAt    DateTime  @updatedAt
-  createdAt    DateTime  @default(now())
-}
-
-model Conversation {
-  id            String   @id @default(uuid())
-  jid           String   @unique
-  lastMessage   String?
-  unreadCount   Int      @default(0)
-  platform      String   @default("whatsapp")
-  leadId        String
-  lead          Lead     @relation(fields: [leadId], references: [id])
-  messages      Message[]
-  updatedAt     DateTime @updatedAt
-  createdAt     DateTime @default(now())
-}
-
-model Message {
-  id             String        @id @default(uuid())
-  content        String
-  sender         String        // 'user', 'lead', 'ai'
-  type           String?       // 'text', 'audio', 'image'
-  mediaUrl       String?       // URL for media attachments
-  leadId         String
-  conversationId String?
-  createdAt      DateTime      @default(now())
-  lead           Lead          @relation(fields: [leadId], references: [id])
-  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  disc         String?
+  toneStyle    String?
+  pace         String?
+  objections   String[] @default([])
+  hooks        String[] @default([])
+  painPoints   String[] @default([])
+  desires      String[] @default([])
+  summary      String?
+  interactions Int      @default(0)
+  lastAnalysis Json?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
 }
 
 model Pipeline {
@@ -123,20 +192,20 @@ model Pipeline {
 }
 
 model AdMetric {
-  id           String   @id @default(uuid())
-  date         DateTime
-  clicks       Int      @default(0)
-  impressions  Int      @default(0)
-  spend        Float    @default(0)
-  reach        Int      @default(0)
-  cpc          Float    @default(0)
-  cpm          Float    @default(0)
-  ctr          Float    @default(0)
-  accountId    String
-  accountName  String?
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  createdAt    DateTime @default(now())
+  id          String   @id @default(uuid())
+  date        DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  spend       Float    @default(0)
+  reach       Int      @default(0)
+  cpc         Float    @default(0)
+  cpm         Float    @default(0)
+  ctr         Float    @default(0)
+  accountId   String
+  accountName String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
 
   @@unique([date, accountId, userId])
 }
@@ -174,7 +243,7 @@ model AdCreativeMetric {
   ctr          Float    @default(0)
   adId         String
   adName       String?
-  campaignName String?  // Reference to parent campaign name for the UI
+  campaignName String?
   status       String?
   accountId    String
   userId       String
@@ -211,10 +280,36 @@ model Automation {
 enum Role {
   ADMIN
   USER
+  SDR
+  MGR
 }
 
 enum IntegrationType {
   META
   GOOGLE
   WHATSAPP
+}
+
+model ManualAdMetric {
+  id           String   @id @default(uuid())
+  date         DateTime
+  platform     String
+  accountName  String
+  campaignName String?
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  spend        Float    @default(0)
+  conversions  Int      @default(0)
+  reach        Int      @default(0)
+  cpc          Float    @default(0)
+  cpm          Float    @default(0)
+  ctr          Float    @default(0)
+  leads        Int      @default(0)
+  messages     Int      @default(0)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date, platform, accountName, userId])
 }

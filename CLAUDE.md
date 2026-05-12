@@ -1,58 +1,48 @@
 ---
-project: InsightFlow
-description: Plataforma SaaS de gestão para Agências de Marketing Social.
+project: WISE CRM IA
+description: Sistema Operacional de Crescimento e CRM p/ Agências, usando IA (Alanis) e Metodologia Wise.
 ---
 
-# CLAUDE.md - Diretrizes de Engenharia (InsightFlow)
+# CLAUDE.md - Diretrizes de Engenharia e Memória (WISE CRM IA)
 
-Bem-vindo ao córtex central do InsightFlow. Este arquivo dita *COMO* o código deve ser construído, mantido e modificado neste projeto. Nada de amnésia: leia essas diretrizes sempre que modificar algo estrutural.
+Bem-vindo ao córtex central do WISE CRM IA. Este documento é o **Technical Design Document (TDD)** imutável. Leia sempre antes de agir. Nós seguimos a metodologia **Everything Claude Code (ECC)**.
 
-## 1. Project Conventions & Style Guide
-- **Variáveis/Funções:** `camelCase` estrito (ex: `getUserData`).
-- **Componentes React/Classes:** `PascalCase` (ex: `MetaCallback`, `DashboardPanel`).
-- **Constantes:** `UPPER_SNAKE_CASE` (ex: `MAX_RETRIES`).
-- **Nomes de Arquivo:**
-  - Frontend (React): `PascalCase.jsx` para componentes e páginas.
-  - Backend/Utilitários: `camelCase.js` com sufixo adequado (ex: `user.service.js`, `oauth.routes.js`).
-- Prefira **Arrow Functions** e procure manter imutabilidade de estado.
+## 1. Regras de Ouro (ECC & Invariants)
+- **Multitenant Obrigatório:** Nenhuma tabela de negócio (`Lead`, `Opportunity`, `Message`) é consultada ou alterada sem injetar o filtro de `companyId`.
+- **Micro-Arquivos:** Arquivos com máximo de 200 a 400 linhas. Refatore imediatamente se passar disso.
+- **TDD & Clean Architecture:** Nenhum código vai para produção sem teste falho primeiro. A regra de negócio mora puramente em `/src/services` (Backend), e é agnóstica ao framework.
+- **Isolamento de Threads (Alanis & Baileys):** O Node.js não pode ser bloqueado pela latência de chamadas à LLM. A API LangChain com Anthropic Claude roda unicamente dentro de workers BullMQ (`aiQueue`).
 
-## 2. Tech Stack & Architecture Overview
-- **Frontend:** React + Vite + TailwindCSS + Axios + Recharts.
-- **Backend:** Node.js + Express.
-- **Banco de Dados:** PostgreSQL via Prisma ORM.
-- **Serviços Externos (APIs):**
-  - Meta Graph API (Facebook Login + Instagram Insights).
-  - OpenAI / Anthropic (Para a "Assistente IA Nativa").
-  - Evolution API (WhatsApp integração futura).
+## 2. BLOD Constraints (Regras de Negócio Inegociáveis)
+- O pipeline não é uma agenda, é uma trava de funil. 
+- Mutações para avançar no estágio do Kanban falharão (HTTP 400) se a entidade associada não tiver os metadados de diagnóstico preenchidos (dor, cenário, implicação).
+- O backend deve expor as 3 métricas vitais para os relatórios:
+    1. Agendamento (Novo -> Diagnóstico).
+    2. No-Show (Diferença Diagnóstico -> Fechamento).
+    3. Taxa de Ganho (Fechamento -> Ganho).
 
-A arquitetura do Backend é `Routes -> Controllers -> Services`. Os Controladores não devem conter regras de negócio complexas, apenas orquestrar req/res. A regra de negócio mora nos `Services`.
+## 3. Tech Stack Autorizada
+- **Frontend:** React 18, Vite, TailwindCSS, Zustand (UI/WS State), TanStack React Query (Cache de REST server state), React Flow, `@hello-pangea/dnd`.
+- **Backend:** Node.js, Express, Socket.io, BullMQ + Redis, Baileys (WA), LangChain.
+- **Data Layer:** PostgreSQL (Supabase), Prisma ORM.
 
-## 3. Testing Requirements & Patterns
-- Código deve ser testável. Evite funções de 500 linhas.
-- Testes ainda não implementados via Jest/Vitest, porém o código deve seguir separação de responsabilidade para permitir injeção de dependência.
+## 4. Dicionário de Estrutura de Pastas (Clean Architecture)
+### Backend (`/backend/src/`)
+- `/api/routes` & `/api/controllers`: Endpoints REST e Validação (Zod).
+- `/services`: Use-cases e lógicas de negócio.
+- `/infrastructure`: Adapters para Prisma, BullMQ, Socket.io e Whatsapp Baileys.
+- `/workers`: Consumidores de filas assíncronas (`alanis.worker.ts`).
 
-## 4. Git Workflow & Branch Strategy
-- Não comite diretamente na `main` quando em produção.
-- Use Conventional Commits (`feat: desc`, `fix: desc`).
+### Frontend (`/frontend/src/`)
+- `/features/inbox`: Componentes da Caixa de Entrada e Painel da Alanis.
+- `/features/kanban`: Componentes do Pipeline.
+- `/lib`: Clientes React Query, Axios.
+- `/hooks`: React Hooks genéricos e Sockets.
 
-## 5. Security & Compliance Rules
-- **NENHUMA chave API de acesso (secrets), tokens, ou senhas devem ser commitados (hardcoded) no código ou em logs em hipótese alguma.**
-- Leia variáveis apenas via `process.env`.
-- Todos os Inputs de formulário React devem ser validados antes do envio.
+## 5. Subagent-Driven Development
+Quando for executar tarefas grandes, fragmente em planos pequenos e invoque **subagentes** usando a CLI interativa (`claude -p "tarefa"` ou ferramentas associadas) para focar em micro-escopos. O agente principal apenas aprova a qualidade (Code Review) e avança.
 
-## 6. File Naming & Folder Conventions
-### Frontend
-- `/src/pages`: Componentes raízes de roteamento (ex: `Dashboard.jsx`).
-- `/src/components`: Componentes reutilizáveis de UI (ex: `Button.jsx`, `MetricCard.jsx`).
-- `/src/services`: Funções de Axios centralizadas (ex: `api.js`).
-
-### Backend
-- `/src/routes`: Definições do Express Router.
-- `/src/controllers`: Handlers (req, res).
-- `/src/services`: Regras de negócio, fetch p/ APIs (ex: `instagram.service.js`).
-- `/src/middlewares`: Tratadores interceptadores (ex: `auth.middleware.js`).
-
-## 7. Review Checklist / Gotchas
-- A API Graph do Facebook muda de token de "curta duração" para "longa duração". Sempre processe a troca antes de salvar no DB.
-- Os redirecionamentos de OAuth (Callback URI) **devem bater EXATAMENTE** com os listados no Developer Console (ex: `http://localhost:5173/meta-callback`).
-- Cuidado ao extrair contas do Meta: O cliente PODE ter um token de Facebook, mas a *Página* dele precisa estar linkada com uma *Conta Instagram Business* previamente via app do Instagram. Caso contrário, a busca vai retornar vazio. Sempre informe esse cenário via try/catch detalhados.
+## 6. Open Decisions (V1)
+- O WhatsApp Web Baileys roda em 1 dispositivo por Agência (sessão compartilhada pelos SDRs).
+- O estado das mensagens na tela será gerido via **React Query** (com o socket emitindo invalidateQueries ou `queryClient.setQueryData`).
+- A sessão do Baileys será serializada no PostgreSQL (ou num container volume específico dependendo do deploy).

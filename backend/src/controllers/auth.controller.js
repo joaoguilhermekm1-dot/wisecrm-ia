@@ -12,20 +12,26 @@ exports.register = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    
+    // ECC: Create Company first, then the User
+    const company = await prisma.company.create({
+      data: { name: `Company of ${name}` }
+    });
+
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         name,
-        // Em um sistema real, criaríamos uma pipeline padrão aqui
+        companyId: company.id
       }
     });
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, companyId: user.companyId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({ 
       token, 
-      user: { id: user.id, email: user.email, name: user.name } 
+      user: { id: user.id, email: user.email, name: user.name, companyId: user.companyId } 
     });
   } catch (err) {
     console.error(err);
@@ -47,11 +53,11 @@ exports.login = async (req, res) => {
       return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, companyId: user.companyId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.json({ 
       token, 
-      user: { id: user.id, email: user.email, name: user.name } 
+      user: { id: user.id, email: user.email, name: user.name, companyId: user.companyId } 
     });
   } catch (err) {
     console.error(err);

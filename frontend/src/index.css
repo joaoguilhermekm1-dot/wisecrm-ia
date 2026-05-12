@@ -218,11 +218,17 @@
   }
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+/* ── Scrollbar Global ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(250, 212, 133, 0.15); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(250, 212, 133, 0.3); }
+
+/* ── Custom Scrollbar Class ── */
+.scrollbar-premium::-webkit-scrollbar { width: 4px; height: 4px; }
+.scrollbar-premium::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-premium::-webkit-scrollbar-thumb { background: rgba(250, 212, 133, 0.2); border-radius: 10px; }
+.scrollbar-premium::-webkit-scrollbar-thumb:hover { background: rgba(250, 212, 133, 0.4); }
 
 /* ── Animations ── */
 @keyframes spin {
@@ -231,6 +237,18 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideLeft {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes shimmer {
   from { background-position: -200% 0; }
@@ -241,7 +259,10 @@
   50%       { box-shadow: 0 0 0 8px rgba(250, 212, 133, 0); }
 }
 
-.animate-fade-in   { animation: fadeIn 0.35s ease both; }
+.animate-fade-in   { animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-up  { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-scale-up  { animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-left{ animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
 
 /* Skeleton loader */

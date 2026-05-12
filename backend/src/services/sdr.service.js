@@ -1,241 +1,257 @@
-const Anthropic = require('@anthropic-ai/sdk');
 const prisma = require('../lib/prisma');
+const aiOrchestrator = require('./ai_orchestrator.service');
 
 /**
- * ═══════════════════════════════════════════════════════════════════════
- *  ALANIS — AGENTE SDR ELITE DA WISE COMPANY
- *  Treinada em: SPIN Selling, Challenger Sale, NLP Conversacional,
- *  DISC, Rapport, Copywriting, Comportamento Humano, Empreendedorismo,
- *  Fluxo Comercial, Comunicação Persuasiva, Funis de Vendas.
- * ═══════════════════════════════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════
+ *  ALANIS V3 — SDR ELITE DA WISE COMPANY
+ *  DNA: Método Wise de Venda Consultiva + DISC + Blood Flow Model
+ *  Missão: Gerar conversas 100% humanizadas, sem robôs, com conexão real.
+ *  Filosofia: "Gerar curiosidade → Diagnosticar → Conduzir → Fechar"
+ * ═══════════════════════════════════════════════════════════════
  */
 class SDRService {
-  constructor() {
-    this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    this.MODEL = 'claude-3-5-sonnet-20241022';
-  }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // AGENTE 1: PROFILER — Analisa o perfil comportamental do lead
-  // ─────────────────────────────────────────────────────────────────────
-  async agentProfiler(messages, currentMemory = null) {
-    const history = messages.slice(-10).map(m =>
+  /**
+   * AGENTE 1: PROFILER DISC
+   * Mapeia o perfil comportamental do lead para personalizar a comunicação.
+   * D = Dominante (direto, resultados), I = Influente (relação, energia),
+   * S = Estável (segurança, processo), C = Consciente (dados, análise)
+   */
+  async agentProfiler(messages, lead) {
+    const history = messages.slice(-12).map(m =>
       `[${m.sender === 'user' ? 'VENDEDOR' : 'LEAD'}]: ${m.content}`
     ).join('\n');
 
-    const existingProfile = currentMemory ? `
-PERFIL ACUMULADO ATÉ AGORA:
-- DISC: ${currentMemory.disc || 'não identificado'}
-- Tom: ${currentMemory.toneStyle || 'não identificado'}
-- Ritmo: ${currentMemory.pace || 'não identificado'}
-- Objeções levantadas: ${(currentMemory.objections || []).join(', ') || 'nenhuma'}
-- O que ressoou: ${(currentMemory.hooks || []).join(', ') || 'nenhum'}
-- Dores identificadas: ${(currentMemory.painPoints || []).join(', ') || 'nenhuma'}
-- Desejos: ${(currentMemory.desires || []).join(', ') || 'nenhum'}
-` : '';
+    const prompt = `Você é um especialista em comportamento humano e perfil DISC.
+Analise esta conversa de vendas e extraia o perfil comportamental do lead "${lead.name}".
 
-    const prompt = `Você é um especialista mundial em perfilagem comportamental, com domínio em DISC, MBTI, PNL, análise linguística e psicologia de vendas.
-
-${existingProfile}
-
-CONVERSA RECENTE:
+HISTÓRICO DA CONVERSA:
 ${history}
 
-TAREFA: Analise a comunicação do lead e retorne um perfil atualizado em JSON.
+CONTEXTO DO LEAD:
+- Status no funil: ${lead.status || 'NOVO'}
+- Temperatura atual: ${lead.temperature || 0}%
+- Número de interações: ${lead.memory?.interactions || 0}
+- Perfil DISC anterior: ${lead.memory?.disc || 'Não mapeado ainda'}
 
-Diretrizes DISC:
-- D (Dominante): direto, impaciente, foco em resultados, pouca emoção
-- I (Influente): animado, sociável, usa emojis, fala muito, entusiasta
-- S (Estável): cauteloso, passivo, precisa de segurança, perguntas de validação
-- C (Cauteloso): analítico, pergunta detalhes, quer provas, lógico
+Analise a FORMA como o lead escreve (palavras usadas, ritmo, emoção, objetividade) para definir:
+- **D (Dominante):** Fala direto, quer resultado, sem rodeios, impaciente
+- **I (Influente):** Amigável, emotivo, gosta de conversa, usa emojis, entusiasta
+- **S (Estável):** Cauteloso, pede garantias, quer processo claro, evita riscos
+- **C (Consciente):** Analítico, pede dados e provas, compara, faz perguntas técnicas
 
-Analise:
-- Tamanho das mensagens (curto = D/C, longo = I/S)
-- Uso de emojis (muito = I, nenhum = D/C)
-- Velocidade de resposta implícita no contexto
-- Tipo de perguntas (racionais = C, emocionais = I, práticas = D)
-- Objeções levantadas (preço = C/D, relacionamento = S/I)
-
-RETORNE JSON:
+RETORNE APENAS JSON VÁLIDO:
 {
   "disc": "D|I|S|C",
-  "toneStyle": "formal|casual|direto|empatico|tecnico",
-  "pace": "rapido|moderado|lento",
-  "objections": ["lista de objeções novas identificadas"],
-  "hooks": ["o que funcionou ou ressoou nessa conversa"],
-  "painPoints": ["dores ou problemas identificados"],
-  "desires": ["objetivos ou desejos explicitados"],
-  "summary": "Resumo de 2 frases sobre o perfil comportamental do lead"
+  "disc_confidence": 0-100,
+  "communication_style": "como falar com esse lead: tom, ritmo, palavras-chave",
+  "pain_signals": ["dor 1 identificada", "dor 2"],
+  "buying_stage": "curiosidade|interesse|consideração|decisão",
+  "objections_predicted": ["possível objeção 1"],
+  "emotional_state": "empolgado|ansioso|desconfiante|neutro|pronto para comprar",
+  "summary": "Resumo tático de uma linha sobre esse lead"
 }`;
 
-    return await this.callAI(prompt);
+    return await aiOrchestrator.call(prompt, 'Você é um especialista em psicologia comportamental aplicada a vendas. Seja preciso e cirúrgico.');
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // AGENTE 2: SDR ALANIS — Gera resposta humanizada e adaptada ao perfil
-  // ─────────────────────────────────────────────────────────────────────
-  async agentSDR(lead, currentMessage, memory, analysis) {
-    const memoryContext = memory ? `
-PERFIL COMPORTAMENTAL DO LEAD:
-- Tipo DISC: ${memory.disc || 'I'} (${this.discDescription(memory.disc)})
-- Tom de comunicação preferido: ${memory.toneStyle || 'casual'}
-- Ritmo de resposta: ${memory.pace || 'moderado'}
-- Objeções que já surgiram: ${(memory.objections || []).join(', ') || 'nenhuma ainda'}
-- O que ressoou com ele: ${(memory.hooks || []).join(', ') || 'nenhum ainda'}
-- Dores identificadas: ${(memory.painPoints || []).join(', ') || 'nenhuma ainda'}
-- Desejos e objetivos: ${(memory.desires || []).join(', ') || 'não mapeado ainda'}
-- Contexto acumulado: ${memory.summary || 'primeiro contato'}
-- Interações anteriores: ${memory.interactions || 0}
-` : 'Primeiro contato com o lead, sem histórico prévio.';
+  /**
+   * AGENTE 2: ALANIS — A MELHOR SDR DO BRASIL
+   * Gera a mensagem ideal: humanizada, contextualizada, com intenção comercial.
+   * Baseada no Método Wise de Venda Consultiva.
+   */
+  async agentSDR(lead, currentMessage, profile, recentMessages) {
+    const conversationSummary = recentMessages
+      .slice(-8)
+      .map(m => `${m.sender === 'user' ? 'Eu' : lead.name}: ${m.content}`)
+      .join('\n');
 
-    const analysisContext = analysis ? `
-ANÁLISE DA MENSAGEM ATUAL:
-- Intenção: ${analysis.intencao}
-- Temperatura: ${analysis.temperatura}
-- Nível de consciência: ${analysis.consciencia}
-- Probabilidade de fechamento: ${analysis.probabilidade}%
-- Resumo: ${analysis.resumo}
-` : '';
+    const disc = profile?.disc || 'I';
+    const toneGuide = {
+      'D': 'Seja direta, objetiva, focada em resultado. Sem blá-blá-blá. Vá ao ponto.',
+      'I': 'Seja calorosa, entusiasmada, use o nome da pessoa, crie conexão emocional.',
+      'S': 'Seja tranquila, segura, mostre processo. Evite pressão. Dê garantias.',
+      'C': 'Seja racional, cite dados se tiver, explique o "por quê", seja precisa.'
+    };
 
-    const prompt = `Você é ALANIS, a melhor SDR (Sales Development Representative) do mundo, trabalhando na Wise Company.
+    const stageAction = {
+      'NOVO': 'Objetivo: gerar curiosidade e rapport. NÃO tente vender ainda.',
+      'CONTATO FEITO': 'Objetivo: qualificar o lead com 1 pergunta estratégica sobre a dor dele.',
+      'DIAGNÓSTICO': 'Objetivo: aprofundar o diagnóstico. Use o método Wise: "O que você já tentou que não funcionou?"',
+      'PROPOSTA ENVIADA': 'Objetivo: garantir que a proposta foi vista e abrir espaço para dúvidas.',
+      'NEGOCIAÇÃO': 'Objetivo: ancorar o valor. Nunca defenda preço atacando concorrente. Reconstrua a percepção de valor.',
+      'FECHADO': 'Objetivo: reforçar a decisão, celebrar e alinhar próximos passos do onboarding.',
+      'FOLLOWUP': 'Objetivo: manter o relacionamento ativo. Entregue um insight de valor.',
+      'PERDIDO': 'Objetivo: manter a porta aberta com educação. Plantar semente para o futuro.'
+    };
 
-IDENTIDADE:
-- Você é humanizada, empática e estratégica
-- Você domina SPIN Selling, Rapport, NLP, Storytelling de Vendas e Copywriting Conversacional
-- Você NUNCA parece um robô ou script genérico
-- Você adapta COMPLETAMENTE sua comunicação ao perfil de cada lead
-- Você sabe criar urgência de forma natural e elegante
-- Você move o lead no funil sem pressão explícita
+    const prompt = `Você é ALANIS — a melhor SDR do Brasil. Você trabalha para a Wise Company.
 
-LEAD: ${lead.name}
-MENSAGEM ATUAL DO LEAD: "${currentMessage}"
+FILOSOFIA WISE DE VENDA CONSULTIVA:
+- Diagnóstico antes de solução (nunca apresente proposta sem ouvir a fundo)
+- Perguntas antes de preço
+- Conduz estrategicamente — não empurra, não convence, CONDUZ
+- Frases modelo: "O que te impediria de fecharmos hoje?", "O que você já tentou que não funcionou?", "Se continuasse como está, como estaria daqui a um ano?"
 
-${memoryContext}
-${analysisContext}
+CONVERSA RECENTE:
+${conversationSummary}
 
-REGRAS DE OURO:
-1. Se DISC = D: seja DIRETA, sem rodeios, foco em resultado/ROI, máximo 2 frases
-2. Se DISC = I: seja ENTUSIASMADA, use 1-2 emojis, seja calorosa, crie conexão pessoal
-3. Se DISC = S: seja ACOLHEDORA, dê segurança, não pressione, valide os sentimentos dele
-4. Se DISC = C: seja TÉCNICA, forneça dados/provas, evite emoções excessivas, seja precisa
-5. SEMPRE termine com uma pergunta ou micro-CTA que avance a conversa
-6. NUNCA use: "Olá! Como posso ajudar?" ou frases genéricas
-7. Use o nome do lead com naturalidade (máximo 1x por resposta)
-8. Se houver objeções, use o método FEEL-FELT-FOUND ou ARCA
-9. Máximo 3 frases por resposta (a menos que seja necessário mais)
-10. Seja 100% HUMANA, não mencione que é IA
+ÚLTIMA MENSAGEM DO LEAD:
+"${currentMessage}"
 
-RETORNE JSON:
+PERFIL DO LEAD "${lead.name}":
+- Perfil DISC: ${disc} — ${toneGuide[disc] || toneGuide['I']}
+- Estado emocional: ${profile?.emotional_state || 'neutro'}
+- Dores identificadas: ${(profile?.pain_signals || []).join(', ') || 'nenhuma ainda'}
+- Etapa no funil: ${lead.status || 'NOVO'}
+- ${stageAction[lead.status] || stageAction['NOVO']}
+
+REGRAS DE OURO (NUNCA QUEBRE):
+1. JAMAIS use linguagem de robô ou vendedor de telemarketing
+2. JAMAIS comece a mensagem com "Olá!" ou "Olá, [Nome]!" genérico
+3. JAMAIS use frases feitas como "Fico feliz em ajudar" ou "Com certeza!"
+4. A mensagem deve soar como se o JOÃO (dono da Wise) estivesse escrevendo pessoalmente
+5. Use o nome do lead NO MÁXIMO 1 vez e apenas se fizer sentido natural
+6. Seja específico ao contexto — referencie algo que o lead disse
+7. Máximo 3 linhas. Mensagens curtas convertem mais no WhatsApp.
+8. Se o lead fez uma pergunta, responda-a ANTES de avançar com a próxima jogada comercial
+9. Crie abertura para a resposta (não feche a conversa)
+
+RETORNE APENAS JSON VÁLIDO:
 {
-  "response": "texto da resposta aqui",
-  "tone_used": "tom que você usou",
-  "strategy": "estratégia aplicada nessa resposta"
+  "response": "a mensagem que Alanis enviaria — natural, humana, direta ao contexto",
+  "rationale": "por que essa mensagem foi escolhida (1 linha para o SDR entender a estratégia)",
+  "next_action": "qual deve ser o próximo passo comercial após esta mensagem",
+  "urgency_level": "baixa|média|alta",
+  "followup_trigger": "em quantos dias fazer follow-up se não houver resposta (ex: 2 dias)"
 }`;
 
-    return await this.callAI(prompt);
+    return await aiOrchestrator.call(
+      prompt,
+      'Você é Alanis, a SDR mais humanizada e estratégica do Brasil. Sua missão é criar conexão real e conduzir o lead ao fechamento com elegância.'
+    );
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // AGENTE 3: ESTRATEGISTA — Define próximo passo comercial
-  // ─────────────────────────────────────────────────────────────────────
-  async agentStrategist(lead, analysis, memory) {
-    const prompt = `Você é o Estrategista Comercial Chefe da Wise Company, com 20 anos de experiência em vendas B2B e B2C.
+  /**
+   * AGENTE 3: ANALISTA EM TEMPO REAL
+   * Gera análise recorrente da conversa e 3 sugestões de abordagem distintas.
+   * Executado de forma assíncrona para não bloquear o fluxo principal.
+   */
+  async agentRealtimeAnalyst(lead, messages, profile) {
+    const history = messages.slice(-10).map(m =>
+      `[${m.sender === 'user' ? 'SDR' : lead.name}]: ${m.content}`
+    ).join('\n');
 
-LEAD: ${lead.name}
-STATUS ATUAL: ${lead.status}
-TEMPERATURA: ${lead.temperature}%
-PROBABILIDADE: ${lead.probability}%
+    const prompt = `Você é o Analista Comercial em Tempo Real da Wise Company.
 
-ANÁLISE DA IA:
-${JSON.stringify(analysis, null, 2)}
+Analise ESTA conversa agora e gere 3 sugestões de mensagem distintas para o SDR enviar.
+As mensagens devem ser diferentes em abordagem (ex: uma mais direta, uma mais empática, uma com pergunta estratégica).
+
+CONVERSA:
+${history}
 
 PERFIL DO LEAD:
-- DISC: ${memory?.disc || 'não mapeado'}
-- Objeções: ${(memory?.objections || []).join(', ') || 'nenhuma'}
-- Dores: ${(memory?.painPoints || []).join(', ') || 'não mapeadas'}
+- Nome: ${lead.name}
+- DISC: ${profile?.disc || 'I'}
+- Temperatura: ${lead.temperature || 0}%
+- Status: ${lead.status || 'NOVO'}
+- Dores identificadas: ${(profile?.pain_signals || []).join(', ') || 'A mapear'}
 
-ESTRATÉGIA POR TEMPERATURA:
-- QUENTE (70-100): Fechar AGORA. Proposta, agendamento, contrato.
-- MORNO (30-69): Nutrir com prova social, caso de sucesso ou valor percebido.
-- FRIO (0-29): Educação, conteúdo de valor, sem pitch direto ainda.
+REGRAS DAS SUGESTÕES:
+- Cada uma deve ser COMPLETAMENTE diferente em tom e abordagem
+- Máximo 3 linhas cada
+- 100% humanizadas — sem linguagem robótica
+- Baseadas no contexto específico desta conversa (não genéricas)
+- Seguir o Método Wise: conduzir, não empurrar
 
-RETORNE JSON:
+RETORNE APENAS JSON VÁLIDO:
 {
-  "proxima_acao": "ex: enviar proposta, agendar call, mandar case de sucesso",
-  "tempo_acao": "ex: imediato, 2h, hoje, amanhã",
-  "objetivo": "ex: avançar para proposta, quebrar objeção de preço",
-  "sugestao_estrategica": "instrução curta e prática para o vendedor",
-  "stage_sugerido": "ex: DIAGNÓSTICO, PROPOSTA, FECHAMENTO"
+  "temperatura_atual": 0-100,
+  "intencao_compra": "curiosidade|interesse|consideração|decisão|objeção",
+  "risco_perda": "baixo|médio|alto",
+  "diagnostico_rapido": "1 frase sobre onde essa conversa está agora",
+  "sugestoes": [
+    { "tipo": "Direta", "mensagem": "...", "por_que": "..." },
+    { "tipo": "Empática", "mensagem": "...", "por_que": "..." },
+    { "tipo": "Pergunta Estratégica", "mensagem": "...", "por_que": "..." }
+  ],
+  "alerta": "algum sinal de alerta ou oportunidade que o SDR deve notar agora"
 }`;
 
-    return await this.callAI(prompt);
+    return await aiOrchestrator.call(
+      prompt,
+      'Você é um Analista Comercial de elite. Sua análise é cirúrgica, rápida e acionável.'
+    );
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // PIPELINE PRINCIPAL — Orquestra os 3 agentes + atualiza memória
-  // ─────────────────────────────────────────────────────────────────────
+  /**
+   * PIPELINE PRINCIPAL — Orquestração com DNA Wise Company
+   */
   async processMessage(leadId, currentMessage, messages = []) {
     try {
-      // 1. Buscar lead + memória acumulada
       const lead = await prisma.lead.findUnique({
         where: { id: leadId },
-        include: { memory: true, messages: { orderBy: { createdAt: 'asc' }, take: 20 } }
+        include: {
+          memory: true,
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 20
+          }
+        }
       });
 
       if (!lead) throw new Error('Lead não encontrado');
-
-      const memory = lead.memory;
+      const userId = lead.ownerId;
       const recentMessages = messages.length > 0 ? messages : lead.messages;
 
-      // 2. Agente Profiler — atualiza perfil comportamental
-      const profile = await this.agentProfiler(recentMessages, memory);
+      // 1. Profiler primeiro (precisa para SDR)
+      const profile = await this.agentProfiler(recentMessages, lead);
 
-      // 3. Análise rápida da mensagem atual (reutilizar lógica do intelligence service)
-      const quickAnalysis = {
-        intencao: 'interesse',
-        temperatura: lead.temperature >= 70 ? 'quente' : lead.temperature >= 30 ? 'morno' : 'frio',
-        consciencia: lead.consciousness || 'médio',
-        probabilidade: lead.probability || 30,
-        resumo: lead.summary || 'Lead em análise'
+      // 2. SDR Alanis com perfil injetado
+      const sdrResponse = await this.agentSDR(lead, currentMessage, profile, recentMessages);
+
+      // 3. Analista em tempo real (async, não bloqueia)
+      this.agentRealtimeAnalyst(lead, recentMessages, profile)
+        .then(analysis => {
+          this.updateLeadMemory(leadId, profile, analysis, lead.memory);
+        })
+        .catch(err => console.error('[Realtime Analyst Error]', err.message));
+
+      // Calcular nova temperatura baseada na intenção
+      const tempMap = {
+        'decisão': 90, 'consideração': 70, 'interesse': 50, 'curiosidade': 30, 'objeção': 20
       };
-
-      // 4. Agente SDR — gera resposta humanizada
-      const sdrResponse = await this.agentSDR(lead, currentMessage, memory, quickAnalysis);
-
-      // 5. Agente Estrategista — define próximo passo
-      const strategy = await this.agentStrategist(lead, quickAnalysis, memory);
-
-      // 6. Atualizar memória do lead no banco
-      await this.updateLeadMemory(leadId, profile, memory);
-
-      // 7. Atualizar temperatura/probability do lead
-      const tempMap = { 'quente': 100, 'morno': 50, 'frio': 20 };
-      const newTemp = tempMap[quickAnalysis.temperatura] || lead.temperature;
+      const newTemperature = tempMap[profile?.buying_stage] || lead.temperature || 30;
 
       return {
-        suggestedResponse: sdrResponse.response,
-        analysis: quickAnalysis,
-        strategy,
-        profile,
-        toneUsed: sdrResponse.tone_used,
-        strategyUsed: sdrResponse.strategy,
-        newTemperature: Math.max(lead.temperature, newTemp) // só sobe, nunca desce sem ação
+        suggestedResponse: sdrResponse?.response || 'Em processamento...',
+        rationale: sdrResponse?.rationale,
+        nextAction: sdrResponse?.next_action,
+        urgencyLevel: sdrResponse?.urgency_level,
+        followupTrigger: sdrResponse?.followup_trigger,
+        analysis: {
+          intencao: profile?.buying_stage,
+          temperatura: profile?.disc === 'D' || profile?.buying_stage === 'decisão' ? 'quente'
+            : profile?.buying_stage === 'interesse' ? 'morno' : 'frio',
+          probabilidade: newTemperature,
+          resumo: profile?.summary,
+          disc: profile?.disc,
+          emotional_state: profile?.emotional_state
+        },
+        newTemperature
       };
     } catch (err) {
-      console.error('[SDR Alanis Error]', err.message);
-      // Fallback gracioso para não travar a experiência do usuário
+      console.error('[SDR Alanis V3 Error]', err.message);
       return {
-        suggestedResponse: "Olá! Desculpe, estou processando algumas informações. Como posso te ajudar agora?",
-        analysis: { intencao: 'desconhecida', temperatura: 'morno', probabilidade: 30, resumo: 'Erro no processamento da IA' },
-        strategy: { proxima_acao: 'tentar contato manual', tempo_acao: 'imediato' },
-        newTemperature: 30
+        suggestedResponse: 'Não consegui gerar uma sugestão agora. Verifique sua conexão.',
+        error: true
       };
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // SMART TEMPLATES — Gera templates personalizados para o lead
-  // ─────────────────────────────────────────────────────────────────────
+  /**
+   * Gera templates contextuais baseados no perfil do lead e estágio do funil
+   */
   async generateSmartTemplates(leadId) {
     try {
       const lead = await prisma.lead.findUnique({
@@ -245,92 +261,52 @@ RETORNE JSON:
           messages: { orderBy: { createdAt: 'desc' }, take: 5 }
         }
       });
+      if (!lead) return [];
 
-      if (!lead) return this.getDefaultTemplates();
-
-      const memory = lead.memory;
       const lastMessages = lead.messages.map(m =>
-        `[${m.sender === 'user' ? 'VENDEDOR' : 'LEAD'}]: ${m.content}`
+        `${m.sender === 'user' ? 'Eu' : lead.name}: ${m.content}`
       ).join('\n');
 
-      const prompt = `Você é ALANIS, SDR da Wise Company. Gere 6 templates de mensagem PERSONALIZADOS para o lead abaixo.
+      const prompt = `Gere 6 templates de mensagem para ${lead.name}.
 
-LEAD: ${lead.name}
-STATUS: ${lead.status}
-TEMPERATURA: ${lead.temperature}%
-PERFIL DISC: ${memory?.disc || 'não identificado'}
-TOM PREFERIDO: ${memory?.toneStyle || 'casual'}
-DORES IDENTIFICADAS: ${(memory?.painPoints || []).join(', ') || 'nenhuma'}
-DESEJOS: ${(memory?.desires || []).join(', ') || 'nenhum'}
-OBJEÇÕES: ${(memory?.objections || []).join(', ') || 'nenhuma'}
-
-ÚLTIMAS MENSAGENS:
-${lastMessages || 'Nenhuma mensagem ainda'}
+CONTEXTO:
+- Status: ${lead.status || 'NOVO'}
+- Perfil DISC: ${lead.memory?.disc || 'não mapeado'}
+- Últimas mensagens: ${lastMessages || 'Nenhuma ainda'}
 
 REGRAS:
-- Cada template deve ser específico para ESSE lead, não genérico
-- Adapte o tom ao perfil DISC identificado
-- Inclua contexto real da conversa quando possível
-- Templates devem cobrir: abertura, nutrir, quebra de objeção, urgência, proposta, follow-up
-- Máximo 2 linhas por template
-- Seja humanizado e natural
+- Cada template deve ser ESPECÍFICO para este lead, não genérico
+- Máximo 2 linhas cada
+- Tom natural, humano, sem linguagem robótica
+- Cobrir diferentes momentos: quebra-gelo, qualificação, proposta de valor, objeção, urgência, fechamento
 
-RETORNE JSON (array de 6 objetos):
+RETORNE APENAS JSON VÁLIDO (array de objetos):
 [
-  { "label": "emoji + nome curto", "text": "texto do template" },
-  ...
+  { "label": "nome curto do template", "text": "mensagem completa" },
+  { "label": "...", "text": "..." }
 ]`;
 
-      const result = await this.callAI(prompt);
-
-      // result pode ser array diretamente ou ter uma propriedade
-      if (Array.isArray(result)) return result;
-      if (Array.isArray(result.templates)) return result.templates;
-
-      return this.getDefaultTemplates();
+      const result = await aiOrchestrator.call(prompt, 'Você é Alanis, SDR da Wise Company. Crie templates humanizados e contextualizados.');
+      return Array.isArray(result) ? result : [];
     } catch (err) {
-      console.error('[Smart Templates Error]', err.message);
-      return this.getDefaultTemplates();
+      console.error('[SmartTemplates Error]', err.message);
+      return [];
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ATUALIZAR MEMÓRIA DO LEAD
-  // ─────────────────────────────────────────────────────────────────────
-  async updateLeadMemory(leadId, profile, existingMemory) {
+  /**
+   * Atualiza memória do lead com dados acumulados de todas as análises
+   */
+  async updateLeadMemory(leadId, profile, analysis, existingMemory) {
     try {
-      // Mesclar dados novos com os existentes (acumular, não sobrescrever)
-      const mergedObjections = [...new Set([
-        ...(existingMemory?.objections || []),
-        ...(profile.objections || [])
-      ])].slice(0, 10); // max 10
-
-      const mergedHooks = [...new Set([
-        ...(existingMemory?.hooks || []),
-        ...(profile.hooks || [])
-      ])].slice(0, 10);
-
-      const mergedPainPoints = [...new Set([
-        ...(existingMemory?.painPoints || []),
-        ...(profile.painPoints || [])
-      ])].slice(0, 10);
-
-      const mergedDesires = [...new Set([
-        ...(existingMemory?.desires || []),
-        ...(profile.desires || [])
-      ])].slice(0, 10);
-
       const data = {
-        disc: profile.disc || existingMemory?.disc,
-        toneStyle: profile.toneStyle || existingMemory?.toneStyle,
-        pace: profile.pace || existingMemory?.pace,
-        objections: mergedObjections,
-        hooks: mergedHooks,
-        painPoints: mergedPainPoints,
-        desires: mergedDesires,
-        summary: profile.summary || existingMemory?.summary,
+        disc: profile?.disc || existingMemory?.disc,
+        summary: profile?.summary || existingMemory?.summary,
         interactions: (existingMemory?.interactions || 0) + 1,
-        lastAnalysis: profile
+        lastAnalysis: { profile, analysis, timestamp: new Date().toISOString() },
+        communicationStyle: profile?.communication_style || existingMemory?.communicationStyle,
+        painSignals: profile?.pain_signals || existingMemory?.painSignals || [],
+        predictedObjections: profile?.objections_predicted || existingMemory?.predictedObjections || []
       };
 
       await prisma.leadMemory.upsert({
@@ -343,40 +319,8 @@ RETORNE JSON (array de 6 objetos):
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // HELPERS
-  // ─────────────────────────────────────────────────────────────────────
-  discDescription(disc) {
-    const map = {
-      D: 'Dominante — direto, impaciente, foco em resultado',
-      I: 'Influente — animado, sociável, emocional, entusiasta',
-      S: 'Estável — cauteloso, precisa de segurança, passivo',
-      C: 'Cauteloso — analítico, quer dados e provas, lógico'
-    };
-    return map[disc] || 'Perfil não identificado ainda';
-  }
-
-  getDefaultTemplates() {
-    return [
-      { label: '👋 Boas-vindas', text: 'Olá! Obrigado por entrar em contato. Como posso te ajudar hoje?' },
-      { label: '📅 Agendar', text: 'Ótimo! Vamos agendar uma conversa. Qual o melhor horário para você?' },
-      { label: '📋 Proposta', text: 'Preparei uma proposta personalizada para você. Posso te enviar agora?' },
-      { label: '🔥 Urgência', text: 'Esta oferta é por tempo limitado! Posso te ajudar a fechar hoje?' },
-      { label: '✅ Confirmação', text: 'Perfeito! Tudo confirmado. Em breve entrarei em contato com mais detalhes.' },
-      { label: '📞 Follow-up', text: 'Oi! Só passando para saber se ficou alguma dúvida. Posso ajudar em algo?' },
-    ];
-  }
-
-    } catch (err) {
-      console.error('[SDR callAI Error]', err.message);
-      // Fallback em caso de erro na API do Anthropic
-      if (prompt.includes('templates')) return this.getDefaultTemplates();
-      return { 
-        response: "Desculpe, tive um breve lapso. Pode me dizer mais sobre seus objetivos?", 
-        error: true,
-        strategy: "Fallback por erro de API"
-      };
-    }
+  async callAI(prompt) {
+    return await aiOrchestrator.call(prompt);
   }
 }
 
