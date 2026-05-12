@@ -2,20 +2,20 @@ const prisma = require('../lib/prisma');
 
 const DEFAULT_STAGES = [
   'NOVO',
-  'PROSPECÇÃO',
-  'DIAGNÓSTICO',
+  'PROSPECÇÂO',
+  'DIAGNOSTICO',
   'FECHAMENTO',
   'FECHADO',
-  'FOLLOW-UP'
+  'FOLOWUP'
 ];
 
 const STAGE_META = {
   'NOVO':        { color: '#FAD485', emoji: '🌱', description: 'Lead acabou de entrar no funil.' },
-  'PROSPECÇÃO':  { color: '#60A5FA', emoji: '🔎', description: 'Prospecção ativa — primeiro contato e qualificação.' },
-  'DIAGNÓSTICO': { color: '#A78BFA', emoji: '🩺', description: 'Diagnóstico do cliente — entender dores e necessidades.' },
+  'PROSPECÇÂO':  { color: '#60A5FA', emoji: '🔎', description: 'Prospecção ativa — primeiro contato e qualificação.' },
+  'DIAGNOSTICO': { color: '#A78BFA', emoji: '🩺', description: 'Diagnóstico do cliente — entender dores e necessidades.' },
   'FECHAMENTO':  { color: '#FB923C', emoji: '🤝', description: 'Negociação final — proposta enviada, aguardando decisão.' },
   'FECHADO':     { color: '#34D399', emoji: '✅', description: 'Venda fechada! Novo cliente convertido.' },
-  'FOLLOW-UP':     { color: '#2DD4BF', emoji: '🔄', description: 'Pós-venda ativo — acompanhamento e fidelização.' },
+  'FOLOWUP':     { color: '#2DD4BF', emoji: '🔄', description: 'Pós-venda ativo — acompanhamento e fidelização.' },
 };
 
 exports.getStageMeta = () => STAGE_META;

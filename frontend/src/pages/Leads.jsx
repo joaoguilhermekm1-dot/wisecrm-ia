@@ -341,7 +341,7 @@ const STAGE_STYLES = {
   'DIAGNDIAGNOSTICO':  { color: '#A78BFA', emoji: '\ud83e\ude7a', bg: 'rgba(167,139,250,0.06)' },
   'FECHAMENTO':        { color: '#FB923C', emoji: '\ud83e\udd1d', bg: 'rgba(251,146,60,0.06)' },
   'FECHADO':           { color: '#34D399', emoji: '\u2705', bg: 'rgba(52,211,153,0.06)' },
-  'FOLLOWUP':          { color: '#2DD4BF', emoji: '\ud83d\udd04', bg: 'rgba(45,212,191,0.06)' },
+  'FOLOWUP':           { color: '#2DD4BF', emoji: '🔄', bg: 'rgba(45,212,191,0.06)' },
   'DEFAULT':           { color: '#9B9589', emoji: '\ud83d\udccc', bg: 'rgba(155,149,137,0.06)' },
 };
 const getStageStyle = (id) => STAGE_STYLES[normalizeStageKey(id)] || STAGE_STYLES.DEFAULT;
